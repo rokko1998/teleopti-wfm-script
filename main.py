@@ -57,6 +57,8 @@ REPORT_URL = (
 def get_driver(headless: bool = True) -> webdriver.Chrome:
     """Создает и настраивает Chrome WebDriver с автоматической установкой драйвера."""
     opts = webdriver.ChromeOptions()
+
+    # Основные опции
     if headless:
         opts.add_argument("--headless=new")
     opts.add_argument("--auth-server-whitelist=*")  # NTLM/SSO
@@ -64,11 +66,51 @@ def get_driver(headless: bool = True) -> webdriver.Chrome:
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-gpu")
 
-    # Автоматическая установка ChromeDriver
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=opts)
-    driver.set_window_size(1600, 1000)
-    return driver
+    # Дополнительные опции для Chrome 138+
+    opts.add_argument("--disable-blink-features=AutomationControlled")
+    opts.add_argument("--disable-extensions")
+    opts.add_argument("--disable-plugins")
+    opts.add_argument("--disable-background-timer-throttling")
+    opts.add_argument("--disable-backgrounding-occluded-windows")
+    opts.add_argument("--disable-renderer-backgrounding")
+    opts.add_argument("--disable-features=TranslateUI")
+    opts.add_argument("--disable-ipc-flooding-protection")
+
+    # Настройка папки загрузок - КРИТИЧЕСКИ ВАЖНО!
+    # Указываем браузеру скачивать файлы в папку проекта downloads/
+    prefs = {
+        "download.default_directory": str(DOWNLOAD_DIR.absolute()),
+        "download.prompt_for_download": False,
+        "download.directory_upgrade": True,
+        "safebrowsing.enabled": True,
+        "profile.default_content_settings.popups": 0,
+        "profile.default_content_setting_values.automatic_downloads": 1
+    }
+    opts.add_experimental_option("prefs", prefs)
+
+    # Убираем детекцию автоматизации
+    opts.add_experimental_option("excludeSwitches", ["enable-automation"])
+    opts.add_experimental_option('useAutomationExtension', False)
+
+    try:
+        # Автоматическая установка ChromeDriver для Chrome 138+
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=opts)
+
+        # Убираем индикатор автоматизации
+        driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+
+        driver.set_window_size(1600, 1000)
+        logger.info(f"Chrome WebDriver инициализирован успешно")
+        return driver
+
+    except Exception as e:
+        logger.error(f"Ошибка инициализации Chrome WebDriver: {e}")
+        logger.info("Попробуйте:")
+        logger.info("1. Обновить Chrome до последней версии")
+        logger.info("2. Перезапустить скрипт (webdriver-manager попробует снова)")
+        logger.info("3. Очистить кэш: rm -rf ~/.wdm/ (Mac/Linux) или del %USERPROFILE%\\.wdm\\ (Windows)")
+        raise
 
 
 def wait_download(start_ts: float, timeout: int = 60) -> Path:
