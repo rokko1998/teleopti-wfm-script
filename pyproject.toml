@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "teleopti-wfm"
+version = "0.1.0"
+description = "WFM script for extracting lost calls and excess traffic from Teleopti"
+authors = ["Sheva <sheva@example.com>"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.11"
+selenium = "^4.0.0"
+webdriver-manager = "^4.0.0"
+pandas = "^2.0.0"
+numpy = "^1.24.0"
+pyyaml = "^6.0"
+loguru = "^0.7.0"
+python-dateutil = "^2.8.0"
+
+[tool.poetry.group.dev.dependencies]
+black = "^23.0.0"
+flake8 = "^6.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
