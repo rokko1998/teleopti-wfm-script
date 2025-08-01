@@ -1,0 +1,10 @@
+selenium>=4.27.0
+webdriver-manager>=4.0.2
+numpy>=2.3.1
+pandas>=2.0
+PyYAML>=6.0
+loguru>=0.7.0
+python-dateutil>=2.8.0
+openpyxl
+# (и, если понадобится typer для CLI:)
+# typer[all]>=0.9.0
