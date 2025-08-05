@@ -51,10 +51,19 @@ def filter_problems_by_date(df: pd.DataFrame, target_date: date) -> pd.DataFrame
     # Фильтруем проблемы:
     # 1. Проблема была открыта до или в указанную дату (Старт <= конец дня)
     # 2. Проблема была закрыта после или в указанную дату (Окончание >= начало дня) или не закрыта (Окончание is null)
-    filtered_df = df[
+    # 3. Если есть колонка "Название", исключаем проблемы с названием 'nan'
+    time_filter = (
         (df['Старт'] <= target_datetime_end) &
         ((df['Окончание'] >= target_datetime_start) | df['Окончание'].isna())
-    ].copy()
+    )
+    
+    # Добавляем фильтр по названию если колонка существует
+    if 'Название' in df.columns:
+        name_filter = ~(df['Название'].astype(str).str.strip().str.lower() == 'nan')
+        filtered_df = df[time_filter & name_filter].copy()
+        logger.info(f"🔍 Исключены проблемы с названием 'nan'")
+    else:
+        filtered_df = df[time_filter].copy()
 
     logger.info(f"📊 Найдено {len(filtered_df)} проблем активных в дату {target_date.strftime('%d.%m.%Y')}")
 

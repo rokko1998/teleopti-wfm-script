@@ -109,6 +109,7 @@ skills:
 
 # Соответствие регионов из Excel к навыкам в Teleopti
 regions:
+  # Основные регионы (уже были)
   Абакан:
     - "308"  # Abakan
   Архангельск:
@@ -163,3 +164,201 @@ regions:
     - "390"  # Vologda
   Ярославль:
     - "523"  # Yaroslavl
+
+  # Дополнительные регионы из логов
+  Ростов-на-Дону:
+    - "372"  # Rostov
+  Москва:
+    - "167"  # Msk
+  Казань:
+    - "303"  # Kazan'
+  Кемерово:
+    - "521"  # Kemerovo
+  Ханты-Мансийск:
+    - "382"  # Khanty-Mansiysk
+  Киров:
+    - "422"  # Kirov_sar
+  Коми:
+    - "313"  # Komi
+  Кострома:
+    - "410"  # Kostroma
+  Краснодар:
+    - "435"  # Krasnodar
+  Красноярск:
+    - "237"  # Krasnoyarsk
+  Курган:
+    - "551"  # Kurgan
+  Курск:
+    - "285"  # Kursk
+  Липецк:
+    - "296"  # Lipetsk
+  Магадан:
+    - "898"  # Magadan
+  Мурманск:
+    - "424"  # Murmansk
+  Нижний Новгород:
+    - "370"  # NNovgorod
+  Норильск:
+    - "305"  # Noril'sk
+  Новосибирск:
+    - "235"  # Novosibirsk
+  Омск:
+    - "378"  # Omsk
+  Орел:
+    - "379"  # Orel
+  Оренбург:
+    - "839"  # Orenburg
+  Пенза:
+    - "815"  # Penza_sar
+  Пермь:
+    - "813"  # Perm
+  Петрозаводск:
+    - "811"  # Petrozavodsk
+  Псков:
+    - "814"  # Pskov
+  Рязань:
+    - "895"  # Ryazan'
+  Сахалин:
+    - "314"  # Sakhalin
+  Салехард:
+    - "476"  # Salekhard
+  Самара:
+    - "808"  # Samara
+  Йошкар-Ола:
+    - "825"  # Yoshkar-Ola_sar
+  Ижевск:
+    - "383"  # Igevsk
+  Иркутск:
+    - "413"  # Irkutsk
+  Иваново:
+    - "315"  # Ivanovo
+  Калининград:
+    - "306"  # Kaliningrad
+  Калуга:
+    - "431"  # Kaluga
+  Камчатка:
+    - "384"  # Kamchatka
+  Горно-Алтайск:
+    - "233"  # Gorno-Altaysk
+  Великий Новгород:
+    - "433"  # V.Novgorod
+
+  # Специальные регионы и навыки
+  Help_611:
+    - "747"  # Help_611
+  HightPriorityChe:
+    - "745"  # HightPriorityChe
+  HightPriorityIrk:
+    - "743"  # HightPriorityIrk
+  HightPriorityMsk:
+    - "703"  # HightPriorityMsk
+  HightPriorityRos:
+    - "742"  # HightPriorityRos
+  HightPrioritySar:
+    - "377"  # HightPrioritySar
+  HightPrioritySPB:
+    - "311"  # HightPrioritySPB
+  konsultant_irk:
+    - "553"  # konsultant_irk
+  konsultant_rostov:
+    - "228"  # konsultant_rostov
+  LowPriority_ИКЦ:
+    - "234"  # LowPriority_ИКЦ
+  LowPriority_РКЦ:
+    - "638"  # LowPriority_РКЦ
+  LowPriority_СКЦ:
+    - "714"  # LowPriority_СКЦ
+  LowPriority_ЧКЦ:
+    - "716"  # LowPriority_ЧКЦ
+  Paid610:
+    - "835"  # Paid610
+  problem_irk:
+    - "837"  # problem_irk
+  Rouming:
+    - "838"  # Rouming
+  Voxys_611:
+    - "833"  # Voxys 611
+  z_Abakan_irk:
+    - "836"  # z_Abakan_irk
+  z_Barnaul_irk:
+    - "897"  # z_Barnaul_irk
+  z_Belgorod:
+    - "524"  # z_Belgorod
+  z_Belgorod_Ros:
+    - "303"  # z_Belgorod_Ros
+  z_Cheboksary:
+    - "521"  # z_Cheboksary
+  z_Cheboksary_Che:
+    - "382"  # z_Cheboksary_Che
+  z_Chelyabinsk_Ural:
+    - "422"  # z_Chelyabinsk_Ural
+  z_Igevsk:
+    - "313"  # z_Igevsk
+  z_Kazan_sar:
+    - "410"  # z_Kazan'_sar
+  z_Khanty-Mansiysk_chel:
+    - "435"  # z_Khanty-Mansiysk_chel
+  z_Kirov:
+    - "237"  # z_Kirov
+  z_Kirov_NEW:
+    - "551"  # z_Kirov_NEW
+  z_Krasnoyarsk_povtor:
+    - "285"  # z_Krasnoyarsk_povtor
+  z_Moscow:
+    - "296"  # z_Moscow
+  z_Moscow_povtor:
+    - "898"  # z_Moscow_povtor
+  z_Moscow_povtor_New:
+    - "424"  # z_Moscow_povtor_New
+  z_NEW_DAY_Volgograd:
+    - "370"  # z_NEW_DAY_Volgograd
+  z_NEW_Volgograd:
+    - "305"  # z_NEW_Volgograd
+  z_NNovgorodNSS:
+    - "235"  # z_NNovgorodNSS
+  z_Penza:
+    - "378"  # z_Penza
+  z_Penza_sar:
+    - "379"  # z_Penza_sar
+  z_Perm_chel:
+    - "839"  # z_Perm_chel
+  z_Perm_povtor:
+    - "815"  # z_Perm_povtor
+  z_product_chel:
+    - "813"  # z_product_chel
+  z_product_irk:
+    - "811"  # z_product_irk
+  z_product_ros:
+    - "814"  # z_product_ros
+  z_product_sar:
+    - "895"  # z_product_sar
+  z_RTK:
+    - "314"  # z_RTK
+  z_RTK_Chel:
+    - "476"  # z_RTK_Chel
+  z_RTK_Sar:
+    - "808"  # z_RTK_Sar
+  z_Ryazan:
+    - "825"  # z_Ryazan'
+  z_Sakhalin_irk:
+    - "383"  # z_Sakhalin_irk
+  z_SPB_povtor:
+    - "413"  # z_SPB_povtor
+  z_Tomsk_rk:
+    - "315"  # z_Tomsk_rk
+  z_Tula_Sar:
+    - "306"  # z_Tula_Sar
+  z_Tula_sar:
+    - "431"  # z_Tula_sar
+  z_Tyumen_chel:
+    - "384"  # z_Tyumen_chel
+  z_Ulyanovsk_chel:
+    - "233"  # z_Ulyanovsk_chel
+  z_Volgograd:
+    - "433"  # z_Volgograd
+  z_Yoshkar-ola:
+    - "765"  # z_Yoshkar-ola
+  Картограф:
+    - "584"  # Картограф
+  Отказ от InVoice:
+    - "227"  # Отказ от InVoice
