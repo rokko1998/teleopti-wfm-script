@@ -12,10 +12,10 @@ from loguru import logger
 def calc_metrics(path: Path) -> Tuple[int, float]:
     """
     Читает 2‑й лист отчёта и возвращает (lost, excess).
-    
+
     Args:
         path: Путь к Excel файлу с отчетом
-    
+
     Returns:
         Tuple[int, float]: (lost_calls, excess_traffic)
     """
@@ -38,10 +38,10 @@ def calc_metrics(path: Path) -> Tuple[int, float]:
 def prepare_excel_data(input_xlsx_path: Path) -> pd.DataFrame:
     """
     Читает и подготавливает данные из Excel файла.
-    
+
     Args:
         input_xlsx_path: Путь к входному Excel файлу
-    
+
     Returns:
         pd.DataFrame: Подготовленные данные
     """
@@ -66,10 +66,10 @@ def prepare_excel_data(input_xlsx_path: Path) -> pd.DataFrame:
 def parse_datetime_columns(df: pd.DataFrame) -> pd.DataFrame:
     """
     Парсит колонки с датами и временем.
-    
+
     Args:
         df: DataFrame с данными
-    
+
     Returns:
         pd.DataFrame: DataFrame с корректно распарсенными датами
     """
@@ -95,7 +95,7 @@ def parse_datetime_columns(df: pd.DataFrame) -> pd.DataFrame:
 def log_data_summary(df: pd.DataFrame):
     """
     Выводит сводную информацию о загруженных данных.
-    
+
     Args:
         df: DataFrame с данными
     """
@@ -110,21 +110,21 @@ def log_data_summary(df: pd.DataFrame):
 def validate_region_in_config(region: str, config: Dict[str, Any]) -> bool:
     """
     Проверяет есть ли регион в конфигурации.
-    
+
     Args:
         region: Название региона
         config: Конфигурация из YAML
-    
+
     Returns:
         bool: True если регион найден в конфигурации
     """
     workload_params = config["regions"].get(region)
-    
+
     if not workload_params:
         logger.warning(f"❌ Region '{region}' not found in YAML config → skip")
         logger.info(f"Available regions in config: {list(config['regions'].keys())}")
         return False
-    
+
     logger.info(f"✅ Processing region '{region}' with workload parameters: {workload_params}")
     return True
 
@@ -137,13 +137,13 @@ def create_result_record(
 ) -> Dict[str, Any]:
     """
     Создает запись результата для сохранения.
-    
+
     Args:
         mass_number: Номер массового инцидента
         date_str: Дата в ISO формате
         lost_calls: Количество потерянных звонков
         excess_traffic: Коэффициент превышения трафика
-    
+
     Returns:
         Dict[str, Any]: Запись результата
     """
@@ -158,7 +158,7 @@ def create_result_record(
 def save_results_to_csv(results: List[Dict[str, Any]], out_csv_path: Path):
     """
     Сохраняет результаты в CSV файл.
-    
+
     Args:
         results: Список результатов
         out_csv_path: Путь к выходному CSV файлу
@@ -170,20 +170,20 @@ def save_results_to_csv(results: List[Dict[str, Any]], out_csv_path: Path):
 def process_excel_data(input_xlsx_path: Path) -> pd.DataFrame:
     """
     Полная обработка Excel данных.
-    
+
     Args:
         input_xlsx_path: Путь к входному Excel файлу
-    
+
     Returns:
         pd.DataFrame: Обработанные данные готовые для использования
     """
     # Читаем данные
     df = prepare_excel_data(input_xlsx_path)
-    
+
     # Парсим даты
     df = parse_datetime_columns(df)
-    
+
     # Выводим сводку
     log_data_summary(df)
-    
+
     return df

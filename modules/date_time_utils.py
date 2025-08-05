@@ -79,11 +79,11 @@ def prepare_datetime_for_report(dt: datetime) -> datetime:
     """
     # Преобразуем в datetime без изменения часового пояса
     dt = pd.to_datetime(dt)
-    
+
     # Убираем часовую информацию если есть (оставляем только время МСК)
     if dt.tzinfo is not None:
         dt = dt.replace(tzinfo=None)
-    
+
     return dt
 
 
@@ -91,7 +91,7 @@ def format_time_intervals(start_dt: datetime, end_dt: datetime) -> Tuple[str, st
     """
     Форматирует временные интервалы для отчета.
     Округляет время до 15-минутных интервалов.
-    
+
     Returns:
         Tuple[str, str]: (start_time_str, end_time_str) в формате HH:MM
     """
@@ -101,7 +101,7 @@ def format_time_intervals(start_dt: datetime, end_dt: datetime) -> Tuple[str, st
 
     start_time_str = start_rounded.strftime('%H:%M')
     end_time_str = end_rounded.strftime('%H:%M')
-    
+
     return start_time_str, end_time_str
 
 
@@ -109,16 +109,16 @@ def get_time_format_variations(time_str: str) -> List[str]:
     """
     Возвращает различные варианты форматирования времени для совместимости.
     Убираем ведущие нули для Windows совместимости.
-    
+
     Args:
         time_str: Время в формате HH:MM (например, "01:45")
-    
+
     Returns:
         List[str]: Список вариантов форматирования времени
     """
     # Парсим время
     hour, minute = map(int, time_str.split(':'))
-    
+
     return [
         time_str,  # 01:45
         time_str.lstrip('0').replace(':0', ':'),  # 1:45

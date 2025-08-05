@@ -94,7 +94,7 @@ python main.py test.xlsx --with-skills --headless
 ```python
 # Основные модули
 from modules.selenium_helpers import get_driver, setup_proxy
-from modules.data_processing import process_excel_data, calc_metrics  
+from modules.data_processing import process_excel_data, calc_metrics
 from modules.date_time_utils import windows_for_row
 from modules.skills import setup_skills, prepare_skills_from_config
 from modules.download_manager import download_report

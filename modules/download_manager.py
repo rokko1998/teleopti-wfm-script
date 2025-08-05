@@ -14,8 +14,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 
 from .selenium_helpers import (
-    find_parameter_input, 
-    wait_download, 
+    find_parameter_input,
+    wait_download,
     apply_cdp_download_settings,
     prepare_download_js,
     REPORT_URL
@@ -27,7 +27,7 @@ from .regions import setup_regions
 def setup_date_range(driver, start_dt: datetime, end_dt: datetime):
     """
     Настраивает диапазон дат в форме отчета.
-    
+
     Args:
         driver: WebDriver instance
         start_dt: Дата начала
@@ -67,7 +67,7 @@ def setup_date_range(driver, start_dt: datetime, end_dt: datetime):
 def setup_time_intervals(driver, start_dt: datetime, end_dt: datetime):
     """
     Настраивает временные интервалы в форме отчета.
-    
+
     Args:
         driver: WebDriver instance
         start_dt: Время начала
@@ -76,7 +76,7 @@ def setup_time_intervals(driver, start_dt: datetime, end_dt: datetime):
     try:
         # Получаем отформатированные временные интервалы
         start_time_str, end_time_str = format_time_intervals(start_dt, end_dt)
-        
+
         logger.info(f"🕒 Исходное время: {start_dt.strftime('%H:%M')} - {end_dt.strftime('%H:%M')}")
         logger.info(f"⏰ Округленное время (15-мин интервалы): {start_time_str} - {end_time_str}")
         logger.info(f"   📍 Начало округлено ВНИЗ: {start_dt.strftime('%H:%M')} → {start_time_str}")
@@ -178,10 +178,10 @@ def setup_time_intervals(driver, start_dt: datetime, end_dt: datetime):
 def trigger_excel_download(driver) -> float:
     """
     Запускает скачивание Excel отчета.
-    
+
     Args:
         driver: WebDriver instance
-    
+
     Returns:
         float: Timestamp начала скачивания
     """
@@ -231,13 +231,13 @@ def download_report(
 ) -> Path:
     """
     Открывает форму, выставляет фильтры, скачивает отчёт.
-    
+
     Args:
         driver: WebDriver instance
         region_ids: Список ID регионов
         start_dt: Дата и время начала
         end_dt: Дата и время окончания
-    
+
     Returns:
         Path: Путь к скачанному файлу
     """
@@ -247,23 +247,68 @@ def download_report(
     # ДОПОЛНИТЕЛЬНО: Повторно применяем CDP настройки на странице отчета
     apply_cdp_download_settings(driver)
 
-    # Ждем полной загрузки страницы (сокращенный таймаут)
-    wait = WebDriverWait(driver, 10)  # Сократили с 30 до 10 секунд
+    # Ждем полной загрузки страницы с улучшенной логикой
+    wait = WebDriverWait(driver, 5)
     logger.info("⏳ Ждем загрузки страницы...")
 
-    # Проверяем что страница загрузилась (ищем любую таблицу с параметрами)
-    try:
-        wait.until(EC.presence_of_element_located((By.TAG_NAME, "table")))
-        logger.info("✅ Страница загружена")
-    except Exception as e:
-        logger.error(f"❌ Страница не загрузилась: {e}")
+    # Проверяем что страница загрузилась по специфичным элементам формы
+    form_loaded = False
+    for attempt in range(3):  # 3 попытки
+        try:
+            # Пробуем найти конкретные элементы формы отчета
+            wait_conditions = [
+                # Поле "Дата от"
+                (By.XPATH, "//td[contains(normalize-space(.), 'Дата от')]/following-sibling::td//input[@type='text']"),
+                # Любое поле ввода даты
+                (By.XPATH, "//input[@type='text' and contains(@id, 'date') or contains(@class, 'date')]"),
+                # Таблица с параметрами
+                (By.XPATH, "//table//td[contains(., 'Дата')]"),
+                # Любая таблица (последний резерв)
+                (By.TAG_NAME, "table")
+            ]
+
+            for by_type, selector in wait_conditions:
+                try:
+                    wait.until(EC.presence_of_element_located((by_type, selector)))
+                    logger.info(f"✅ Страница загружена (найден элемент: {selector})")
+                    form_loaded = True
+                    break
+                except:
+                    continue
+
+            if form_loaded:
+                break
+            else:
+                logger.warning(f"⚠️ Попытка {attempt + 1}/3: Форма не загрузилась, обновляем страницу...")
+                driver.refresh()
+                time.sleep(3)
+
+        except Exception as e:
+            logger.warning(f"⚠️ Попытка {attempt + 1}/3 загрузки не удалась: {e}")
+            if attempt < 2:  # Не последняя попытка
+                logger.info("🔄 Обновляем страницу и пробуем снова...")
+                driver.refresh()
+                time.sleep(3)
+
+    if not form_loaded:
+        logger.error(f"❌ Страница не загрузилась после 3 попыток")
         # Показываем что есть на странице
         try:
             page_text = driver.find_element(By.TAG_NAME, "body").text[:500]
             logger.info(f"📄 Содержимое страницы: {page_text}")
         except:
             pass
-        raise
+
+        # Попробуем перезагрузить страницу еще раз
+        logger.info("🔄 Последняя попытка: полная перезагрузка страницы...")
+        driver.get(REPORT_URL)
+        time.sleep(5)
+
+        try:
+            wait.until(EC.presence_of_element_located((By.TAG_NAME, "table")))
+            logger.info("✅ Страница загружена после перезагрузки")
+        except:
+            raise Exception("Страница отчета не загружается - возможно проблемы с сервером")
 
     time.sleep(2)  # Дополнительная пауза для полной загрузки
 
@@ -274,12 +319,15 @@ def download_report(
     setup_time_intervals(driver, start_dt, end_dt)
 
     # --- 3) Рабочая нагрузка (регионы) -------------------------------------------------
+    logger.info("🔧 Настраиваем рабочую нагрузку...")
     if not setup_regions(driver, region_ids):
         raise Exception("Не удалось настроить регионы")
 
+    logger.info("✅ Рабочая нагрузка настроена успешно")
     time.sleep(1)  # Пауза перед генерацией отчета
 
     # --- 4) Excel --------------------------------------------------------------
+    logger.info("📊 Все параметры настроены, генерируем отчет...")
     ts = trigger_excel_download(driver)
 
     # Простое ожидание скачивания файла (без агрессивных попыток)

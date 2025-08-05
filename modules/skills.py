@@ -33,12 +33,12 @@ def find_skills_left_select(driver):
 def add_skill(driver, skills_left_select, skill_id: str) -> bool:
     """
     Добавляет навык по ID в правый список.
-    
+
     Args:
         driver: WebDriver instance
         skills_left_select: Левый селект навыков
         skill_id: ID навыка для добавления
-    
+
     Returns:
         bool: True если навык успешно добавлен
     """
@@ -83,11 +83,11 @@ def add_skill(driver, skills_left_select, skill_id: str) -> bool:
 def verify_skills_selection(driver, expected_skills_ids: List[str]) -> bool:
     """
     Проверяет что все навыки действительно попали в правый список.
-    
+
     Args:
         driver: WebDriver instance
         expected_skills_ids: Список ожидаемых ID навыков
-    
+
     Returns:
         bool: True если все навыки успешно добавлены
     """
@@ -149,10 +149,10 @@ def verify_skills_selection(driver, expected_skills_ids: List[str]) -> bool:
 def prepare_skills_from_config(config: Dict[str, Any]) -> List[str]:
     """
     Подготавливает список навыков из конфигурации.
-    
+
     Args:
         config: Конфигурация из YAML файла
-    
+
     Returns:
         List[str]: Плоский список ID навыков
     """
@@ -166,18 +166,18 @@ def prepare_skills_from_config(config: Dict[str, Any]) -> List[str]:
 
     logger.info(f"✅ Всего навыков для добавления: {len(skills_ids)}")
     logger.info(f"   🔢 ID навыков: {skills_ids}")
-    
+
     return skills_ids
 
 
 def setup_skills(driver, skills_ids: List[str]) -> bool:
     """
     Основная функция настройки навыков.
-    
+
     Args:
         driver: WebDriver instance
         skills_ids: Список ID навыков для добавления
-    
+
     Returns:
         bool: True если все навыки успешно настроены
     """

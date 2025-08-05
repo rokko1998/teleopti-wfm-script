@@ -4,6 +4,7 @@ wfm_single.py — Рефакторированная версия скрипта
 
 Использование:
 python main.py test.xlsx --out-csv result.csv --no-headless
+python main.py test.xlsx --date-filter --save-to-excel  # Новый режим с фильтрацией по дате и сохранением в Excel
 
 Модульная структура:
 - modules/selenium_helpers.py - Настройка WebDriver и вспомогательные функции
@@ -12,6 +13,7 @@ python main.py test.xlsx --out-csv result.csv --no-headless
 - modules/skills.py - Работа с навыками
 - modules/data_processing.py - Обработка данных и вычисления
 - modules/download_manager.py - Скачивание отчетов
+- modules/excel_manager.py - Работа с Excel файлами
 """
 
 from __future__ import annotations
@@ -25,8 +27,8 @@ from loguru import logger
 # Импорты из наших модулей
 from modules.selenium_helpers import get_driver, setup_proxy, apply_cdp_download_settings
 from modules.data_processing import (
-    process_excel_data, 
-    validate_region_in_config, 
+    process_excel_data,
+    validate_region_in_config,
     calc_metrics,
     create_result_record,
     save_results_to_csv
@@ -34,6 +36,7 @@ from modules.data_processing import (
 from modules.date_time_utils import windows_for_row, prepare_datetime_for_report
 from modules.skills import setup_skills, prepare_skills_from_config, show_page_diagnostics
 from modules.download_manager import download_report
+from modules.excel_manager import get_user_date, filter_problems_by_date, calculate_time_window_for_date, save_results_to_excel
 
 # Константы
 BASE_DIR = Path(__file__).resolve().parent
@@ -48,6 +51,8 @@ def main():
     parser.add_argument("--headless", help="Запуск в headless режиме", action="store_true", default=True)
     parser.add_argument("--no-headless", help="Запуск с видимым браузером", action="store_true")
     parser.add_argument("--with-skills", help="Включить работу с навыками (добавление без очистки)", action="store_true")
+    parser.add_argument("--date-filter", help="Фильтровать проблемы по дате (запрашивает дату у пользователя)", action="store_true")
+    parser.add_argument("--save-to-excel", help="Сохранить результаты в исходный Excel файл в таблицу 'Свод_по_заметкам'", action="store_true")
 
     args = parser.parse_args()
 
@@ -72,6 +77,19 @@ def main():
 
     # Обрабатываем Excel данные
     df = process_excel_data(input_xlsx_path)
+
+    # Определяем режим работы
+    use_date_filter = args.date_filter
+    save_to_excel = args.save_to_excel
+
+    if use_date_filter:
+        logger.info("🆕 Включен новый режим работы с фильтрацией по дате")
+        if save_to_excel:
+            logger.info("💾 Результаты будут сохранены в исходный Excel файл")
+        else:
+            logger.info("📄 Результаты будут сохранены в CSV файл")
+    else:
+        logger.info("📋 Используется стандартный режим работы (обработка всех проблем)")
 
     # Инициализируем WebDriver
     driver = get_driver(headless=headless)
@@ -107,8 +125,22 @@ def main():
 
         logger.info("🚀 Начинаем обработку данных из Excel...")
 
-        # Обрабатываем каждую строку из DataFrame
-        for idx, row in df.iterrows():
+        # Выбираем данные для обработки в зависимости от режима
+        if use_date_filter:
+            # Запрашиваем дату у пользователя и фильтруем проблемы
+            target_date = get_user_date()
+            df_to_process = filter_problems_by_date(df, target_date)
+
+            if len(df_to_process) == 0:
+                logger.warning("⚠️ Нет проблем для обработки в указанную дату")
+                return
+        else:
+            # Стандартный режим - обрабатываем все проблемы
+            df_to_process = df
+            target_date = None
+
+        # Обрабатываем каждую строку из выбранного DataFrame
+        for idx, row in df_to_process.iterrows():
             region = row["Регион"]
             logger.info(f"🔄 Обрабатываем строку #{idx}: {row['Номер массовой']} - {region}")
 
@@ -123,9 +155,16 @@ def main():
             logger.info(f"   Старт: {row['Старт']} (тип: {type(row['Старт'])})")
             logger.info(f"   Окончание: {row['Окончание']} (тип: {type(row['Окончание'])})")
 
-            # Получаем все временные окна для этой строки
-            time_windows = list(windows_for_row(row))
-            logger.info(f"📊 Создано временных окон: {len(time_windows)}")
+            # Получаем временные окна в зависимости от режима
+            if use_date_filter:
+                # Новый режим: одно окно для указанной даты
+                win_start, win_end = calculate_time_window_for_date(row, target_date)
+                time_windows = [(win_start, win_end)]
+                logger.info(f"📊 Создано временное окно для даты {target_date.strftime('%d.%m.%Y')}")
+            else:
+                # Стандартный режим: разбиваем на дневные окна
+                time_windows = list(windows_for_row(row))
+                logger.info(f"📊 Создано временных окон: {len(time_windows)}")
 
             for window_idx, (win_start, win_end) in enumerate(time_windows):
                 logger.info(f"🔸 Обрабатываем окно #{window_idx + 1}/{len(time_windows)}")
@@ -147,7 +186,7 @@ def main():
                     xlsx_path = download_report(driver, workload_params, win_start, win_end)
                     logger.info(f"📊 Обрабатываем метрики из файла: {xlsx_path}")
                     lost, excess = calc_metrics(xlsx_path)
-                    
+
                     # Создаем запись результата
                     result = create_result_record(
                         row["Номер массовой"],
@@ -156,7 +195,7 @@ def main():
                         excess
                     )
                     results.append(result)
-                    
+
                     logger.info(f"✅ Успешно обработан {row['Номер массовой']} - {region}: lost={lost}, excess={excess}")
                 except Exception as exc:
                     logger.error(f"❌ ОШИБКА для строки #{idx} MassID {row['Номер массовой']} {region}")
@@ -168,8 +207,13 @@ def main():
                     logger.exception("   Полный traceback:")
                     continue
 
-        # Сохраняем результаты
-        save_results_to_csv(results, out_csv_path)
+        # Сохраняем результаты в зависимости от режима
+        if save_to_excel and use_date_filter:
+            # Сохраняем в исходный Excel файл
+            save_results_to_excel(results, input_xlsx_path, target_date)
+        else:
+            # Сохраняем в CSV файл (стандартный режим)
+            save_results_to_csv(results, out_csv_path)
 
     finally:
         # Закрываем браузер
