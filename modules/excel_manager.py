@@ -65,20 +65,59 @@ def filter_problems_by_date(df: pd.DataFrame, target_date: date) -> pd.DataFrame
 
     # Преобразуем target_date в строку для сравнения
     target_date_str = target_date.strftime('%d.%m.%Y')
+    
+    # ОТЛАДКА: Показываем первые несколько значений дат
+    logger.info(f"🔍 Ищем дату: '{target_date_str}'")
+    logger.info(f"🔍 Первые 5 значений в колонке 'ДатаБезВремени':")
+    for idx, date_val in df['ДатаБезВремени'].head(5).items():
+        logger.info(f"   Строка {idx}: '{date_val}' (тип: {type(date_val)})")
 
-    # Фильтруем проблемы:
-    # 1. Дата в колонке "ДатаБезВремени" совпадает с указанной датой
-    # 2. Исключаем проблемы с регионом 'nan' (отсутствующий регион)
-    date_filter = df['ДатаБезВремени'].astype(str) == target_date_str
+    # Улучшенная фильтрация по дате с учетом разных форматов
+    def normalize_date(date_val):
+        """Нормализует дату к строковому формату DD.MM.YYYY"""
+        if pd.isna(date_val):
+            return None
+        
+        try:
+            if isinstance(date_val, str):
+                # Если это строка, пробуем распарсить
+                return datetime.strptime(date_val, "%d.%m.%Y").strftime("%d.%m.%Y")
+            elif isinstance(date_val, datetime):
+                # Если это datetime объект
+                return date_val.strftime("%d.%m.%Y")
+            elif isinstance(date_val, date):
+                # Если это date объект
+                return date_val.strftime("%d.%m.%Y")
+            else:
+                # Пробуем pandas to_datetime
+                parsed_date = pd.to_datetime(date_val)
+                return parsed_date.strftime("%d.%m.%Y")
+        except Exception as e:
+            logger.warning(f"⚠️ Не удалось нормализовать дату '{date_val}': {e}")
+            return str(date_val)
+
+    # Нормализуем даты в DataFrame
+    normalized_dates = df['ДатаБезВремени'].apply(normalize_date)
+    
+    # Создаем фильтр по дате
+    date_filter = normalized_dates == target_date_str
+    
+    # Фильтр по региону (исключаем 'nan')
     region_filter = ~(df['Регион'].astype(str).str.strip().str.lower() == 'nan')
 
+    # Применяем оба фильтра
     filtered_df = df[date_filter & region_filter].copy()
+    
     logger.info(f"🔍 Исключены проблемы с регионом 'nan'")
-
     logger.info(f"📊 Найдено {len(filtered_df)} проблем для даты {target_date.strftime('%d.%m.%Y')}")
 
     if len(filtered_df) == 0:
         logger.warning(f"⚠️ Не найдено проблем для даты {target_date.strftime('%d.%m.%Y')}")
+        # Дополнительная отладка
+        logger.info(f"🔍 Все уникальные даты в файле:")
+        unique_dates = df['ДатаБезВремени'].dropna().unique()
+        for date_val in unique_dates[:10]:  # Показываем первые 10
+            logger.info(f"   '{date_val}' (тип: {type(date_val)})")
     else:
         logger.info(f"✅ Проблемы для обработки:")
         for idx, row in filtered_df.iterrows():
