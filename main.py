@@ -4,7 +4,7 @@ wfm_single.py — Рефакторированная версия скрипта
 
 Использование:
 python main.py test.xlsx --out-csv result.csv --no-headless
-python main.py test.xlsx --date-filter --save-to-excel  # Новый режим с фильтрацией по дате и сохранением в Excel
+python main.py test.xlsx --auto-date-processing  # Новый режим с автоматическим определением даты
 
 Модульная структура:
 - modules/selenium_helpers.py - Настройка WebDriver и вспомогательные функции
@@ -36,7 +36,12 @@ from modules.data_processing import (
 from modules.date_time_utils import windows_for_row, prepare_datetime_for_report
 from modules.skills import setup_skills, prepare_skills_from_config, show_page_diagnostics
 from modules.download_manager import download_report
-from modules.excel_manager import get_user_date, filter_problems_by_date, calculate_time_window_for_date, save_results_to_excel
+from modules.excel_manager import (
+    get_date_from_first_row,
+    filter_problems_by_date,
+    calculate_time_window_for_date,
+    save_single_result_to_original_file
+)
 
 # Константы
 BASE_DIR = Path(__file__).resolve().parent
@@ -51,8 +56,7 @@ def main():
     parser.add_argument("--headless", help="Запуск в headless режиме", action="store_true", default=True)
     parser.add_argument("--no-headless", help="Запуск с видимым браузером", action="store_true")
     parser.add_argument("--with-skills", help="Включить работу с навыками (добавление без очистки)", action="store_true")
-    parser.add_argument("--date-filter", help="Фильтровать проблемы по дате (запрашивает дату у пользователя)", action="store_true")
-    parser.add_argument("--save-to-excel", help="Сохранить результаты в исходный Excel файл в таблицу 'Свод_по_заметкам'", action="store_true")
+    parser.add_argument("--auto-date-processing", help="Автоматически определять дату из первой строки и обрабатывать только строки с этой датой", action="store_true")
 
     args = parser.parse_args()
 
@@ -79,15 +83,12 @@ def main():
     df = process_excel_data(input_xlsx_path)
 
     # Определяем режим работы
-    use_date_filter = args.date_filter
-    save_to_excel = args.save_to_excel
+    use_auto_date_processing = args.auto_date_processing
 
-    if use_date_filter:
-        logger.info("🆕 Включен новый режим работы с фильтрацией по дате")
-        if save_to_excel:
-            logger.info("💾 Результаты будут сохранены в исходный Excel файл")
-        else:
-            logger.info("📄 Результаты будут сохранены в CSV файл")
+    if use_auto_date_processing:
+        logger.info("🆕 Включен новый режим автоматической обработки по дате")
+        logger.info("📅 Дата будет автоматически определена из первой строки данных")
+        logger.info("💾 Результаты будут сохранены в исходный Excel файл")
     else:
         logger.info("📋 Используется стандартный режим работы (обработка всех проблем)")
 
@@ -125,49 +126,38 @@ def main():
 
         logger.info("🚀 Начинаем обработку данных из Excel...")
 
-        # Выбираем данные для обработки в зависимости от режима
-        if use_date_filter:
-            # Запрашиваем дату у пользователя и фильтруем проблемы
-            target_date = get_user_date()
+        if use_auto_date_processing:
+            # Новый режим: автоматически определяем дату из первой строки данных
+            target_date = get_date_from_first_row(df)
             df_to_process = filter_problems_by_date(df, target_date)
 
             if len(df_to_process) == 0:
                 logger.warning("⚠️ Нет проблем для обработки в указанную дату")
                 return
-        else:
-            # Стандартный режим - обрабатываем все проблемы
-            df_to_process = df
-            target_date = None
 
-        # Обрабатываем каждую строку из выбранного DataFrame
-        for idx, row in df_to_process.iterrows():
-            region = row["Регион"]
-            logger.info(f"🔄 Обрабатываем строку #{idx}: {row['Номер массовой']} - {region}")
+            logger.info(f"📊 Найдено {len(df_to_process)} проблем для даты {target_date.strftime('%d.%m.%Y')}")
 
-            # Проверяем есть ли регион в конфигурации
-            if not validate_region_in_config(region, cfg):
-                continue
+            # Обрабатываем каждую строку из выбранного DataFrame
+            for idx, row in df_to_process.iterrows():
+                region = row["Регион"]
+                mass_number = row["Номер массовой"]
+                logger.info(f"🔄 Обрабатываем строку #{idx}: {mass_number} - {region}")
 
-            workload_params = cfg["regions"][region]
+                # Проверяем есть ли регион в конфигурации
+                if not validate_region_in_config(region, cfg):
+                    logger.warning(f"⚠️ Регион '{region}' не найден в конфигурации, пропускаем")
+                    continue
 
-            # ОТЛАДКА: Показываем исходные времена из Excel
-            logger.info(f"📅 Исходные данные из Excel:")
-            logger.info(f"   Старт: {row['Старт']} (тип: {type(row['Старт'])})")
-            logger.info(f"   Окончание: {row['Окончание']} (тип: {type(row['Окончание'])})")
+                workload_params = cfg["regions"][region]
 
-            # Получаем временные окна в зависимости от режима
-            if use_date_filter:
-                # Новый режим: одно окно для указанной даты
+                # ОТЛАДКА: Показываем исходные времена из Excel
+                logger.info(f"📅 Исходные данные из Excel:")
+                logger.info(f"   Старт: {row['Старт']} (тип: {type(row['Старт'])})")
+                logger.info(f"   Окончание: {row['Окончание']} (тип: {type(row['Окончание'])})")
+
+                # Получаем временное окно для указанной даты
                 win_start, win_end = calculate_time_window_for_date(row, target_date)
-                time_windows = [(win_start, win_end)]
-                logger.info(f"📊 Создано временное окно для даты {target_date.strftime('%d.%m.%Y')}")
-            else:
-                # Стандартный режим: разбиваем на дневные окна
-                time_windows = list(windows_for_row(row))
-                logger.info(f"📊 Создано временных окон: {len(time_windows)}")
 
-            for window_idx, (win_start, win_end) in enumerate(time_windows):
-                logger.info(f"🔸 Обрабатываем окно #{window_idx + 1}/{len(time_windows)}")
                 logger.info(f"🕒 Временное окно (исходное):")
                 logger.info(f"   win_start: {win_start} (тип: {type(win_start)})")
                 logger.info(f"   win_end: {win_end} (тип: {type(win_end)})")
@@ -182,23 +172,32 @@ def main():
                 logger.info(f"   win_end: {win_end}")
 
                 try:
-                    logger.info(f"🚀 Запускаем download_report для {row['Номер массовой']} {win_start.date()}")
+                    logger.info(f"🚀 Запускаем download_report для {mass_number} {win_start.date()}")
                     xlsx_path = download_report(driver, workload_params, win_start, win_end)
                     logger.info(f"📊 Обрабатываем метрики из файла: {xlsx_path}")
                     lost, excess = calc_metrics(xlsx_path)
 
-                    # Создаем запись результата
+                    # Сохраняем результат сразу в исходный файл
+                    save_single_result_to_original_file(
+                        mass_number=mass_number,
+                        lost_calls=lost,
+                        excess_traffic=excess,
+                        original_file_path=input_xlsx_path,
+                        row_index=idx
+                    )
+
+                    # Создаем запись результата для возможного сохранения в CSV
                     result = create_result_record(
-                        row["Номер массовой"],
+                        mass_number,
                         win_start.date().isoformat(),
                         lost,
                         excess
                     )
                     results.append(result)
 
-                    logger.info(f"✅ Успешно обработан {row['Номер массовой']} - {region}: lost={lost}, excess={excess}")
+                    logger.info(f"✅ Успешно обработан {mass_number} - {region}: lost={lost}, excess={excess}")
                 except Exception as exc:
-                    logger.error(f"❌ ОШИБКА для строки #{idx} MassID {row['Номер массовой']} {region}")
+                    logger.error(f"❌ ОШИБКА для строки #{idx} MassID {mass_number} {region}")
                     try:
                         logger.error(f"   Период: {win_start.date()} - {win_end.date()}")
                     except:
@@ -207,11 +206,68 @@ def main():
                     logger.exception("   Полный traceback:")
                     continue
 
-        # Сохраняем результаты в зависимости от режима
-        if save_to_excel and use_date_filter:
-            # Сохраняем в исходный Excel файл
-            save_results_to_excel(results, input_xlsx_path, target_date)
+            logger.info(f"🎉 Обработка завершена! Обработано {len(results)} проблем")
+            logger.info(f"💾 Результаты сохранены в исходный файл: {input_xlsx_path}")
+
         else:
+            # Стандартный режим: обработка всех проблем
+            logger.info("📋 Используется стандартный режим обработки всех проблем")
+
+            # Обрабатываем каждую строку
+            for idx, row in df.iterrows():
+                region = row["Регион"]
+                logger.info(f"🔄 Обрабатываем строку #{idx}: {row['Номер массовой']} - {region}")
+
+                # Проверяем есть ли регион в конфигурации
+                if not validate_region_in_config(region, cfg):
+                    continue
+
+                workload_params = cfg["regions"][region]
+
+                # Разбиваем на дневные окна
+                time_windows = list(windows_for_row(row))
+                logger.info(f"📊 Создано временных окон: {len(time_windows)}")
+
+                for window_idx, (win_start, win_end) in enumerate(time_windows):
+                    logger.info(f"🔸 Обрабатываем окно #{window_idx + 1}/{len(time_windows)}")
+                    logger.info(f"🕒 Временное окно (исходное):")
+                    logger.info(f"   win_start: {win_start} (тип: {type(win_start)})")
+                    logger.info(f"   win_end: {win_end} (тип: {type(win_end)})")
+
+                    # Преобразуем в datetime без изменения часового пояса
+                    win_start = prepare_datetime_for_report(win_start)
+                    win_end = prepare_datetime_for_report(win_end)
+
+                    logger.info(f"🕒 Временное окно (финальное МСК):")
+                    logger.info(f"   win_start: {win_start}")
+                    logger.info(f"   win_end: {win_end}")
+
+                    try:
+                        logger.info(f"🚀 Запускаем download_report для {row['Номер массовой']} {win_start.date()}")
+                        xlsx_path = download_report(driver, workload_params, win_start, win_end)
+                        logger.info(f"📊 Обрабатываем метрики из файла: {xlsx_path}")
+                        lost, excess = calc_metrics(xlsx_path)
+
+                        # Создаем запись результата
+                        result = create_result_record(
+                            row["Номер массовой"],
+                            win_start.date().isoformat(),
+                            lost,
+                            excess
+                        )
+                        results.append(result)
+
+                        logger.info(f"✅ Успешно обработан {row['Номер массовой']} - {region}: lost={lost}, excess={excess}")
+                    except Exception as exc:
+                        logger.error(f"❌ ОШИБКА для строки #{idx} MassID {row['Номер массовой']} {region}")
+                        try:
+                            logger.error(f"   Период: {win_start.date()} - {win_end.date()}")
+                        except:
+                            logger.error(f"   Период: не удалось определить")
+                        logger.error(f"   Детали ошибки: {exc}")
+                        logger.exception("   Полный traceback:")
+                        continue
+
             # Сохраняем в CSV файл (стандартный режим)
             save_results_to_csv(results, out_csv_path)
 

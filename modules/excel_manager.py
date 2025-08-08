@@ -11,29 +11,48 @@ from openpyxl import load_workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 
 
-def get_user_date() -> date:
+def get_date_from_first_row(df: pd.DataFrame) -> date:
     """
-    Запрашивает у пользователя дату для выгрузки.
+    Получает дату из первой строки данных в колонке "ДатаБезВремени".
+
+    Args:
+        df: DataFrame с данными
 
     Returns:
-        date: Выбранная пользователем дата
+        date: Дата из первой строки данных
     """
-    while True:
-        try:
-            date_str = input("📅 Введите дату для выгрузки (формат ДД.ММ.ГГГГ, например 04.05.2025): ").strip()
-            user_date = datetime.strptime(date_str, "%d.%m.%Y").date()
-            logger.info(f"✅ Выбрана дата: {user_date.strftime('%d.%m.%Y')}")
-            return user_date
-        except ValueError:
-            logger.error("❌ Неверный формат даты. Используйте формат ДД.ММ.ГГГГ")
-        except KeyboardInterrupt:
-            logger.info("🛑 Программа прервана пользователем")
-            raise
+    if "ДатаБезВремени" not in df.columns:
+        logger.error("❌ Колонка 'ДатаБезВремени' не найдена в данных")
+        raise ValueError("Колонка 'ДатаБезВремени' обязательна для автоматического определения даты")
+
+    # Получаем первую непустую дату
+    first_date = None
+    for idx, row in df.iterrows():
+        date_value = row['ДатаБезВремени']
+        if pd.notna(date_value) and str(date_value).strip() != '':
+            try:
+                if isinstance(date_value, str):
+                    first_date = datetime.strptime(date_value, "%d.%m.%Y").date()
+                elif isinstance(date_value, datetime):
+                    first_date = date_value.date()
+                else:
+                    first_date = pd.to_datetime(date_value).date()
+                break
+            except Exception as e:
+                logger.warning(f"⚠️ Не удалось распарсить дату '{date_value}' в строке {idx}: {e}")
+                continue
+
+    if first_date is None:
+        logger.error("❌ Не найдена валидная дата в колонке 'ДатаБезВремени'")
+        raise ValueError("Не найдена валидная дата в данных")
+
+    logger.info(f"✅ Автоматически определена дата: {first_date.strftime('%d.%m.%Y')}")
+    return first_date
 
 
 def filter_problems_by_date(df: pd.DataFrame, target_date: date) -> pd.DataFrame:
     """
-    Фильтрует проблемы по дате - оставляет только те, которые были активны в указанную дату.
+    Фильтрует проблемы по дате из колонки "ДатаБезВремени".
 
     Args:
         df: DataFrame с проблемами
@@ -44,37 +63,27 @@ def filter_problems_by_date(df: pd.DataFrame, target_date: date) -> pd.DataFrame
     """
     logger.info(f"🔍 Фильтруем проблемы для даты {target_date.strftime('%d.%m.%Y')}")
 
-    # Преобразуем target_date в datetime для сравнения
-    target_datetime_start = datetime.combine(target_date, datetime.min.time())
-    target_datetime_end = datetime.combine(target_date, datetime.max.time())
+    # Преобразуем target_date в строку для сравнения
+    target_date_str = target_date.strftime('%d.%m.%Y')
 
     # Фильтруем проблемы:
-    # 1. Проблема была открыта до или в указанную дату (Старт <= конец дня)
-    # 2. Проблема была закрыта после или в указанную дату (Окончание >= начало дня) или не закрыта (Окончание is null)
-    # 3. Если есть колонка "Название", исключаем проблемы с названием 'nan'
-    time_filter = (
-        (df['Старт'] <= target_datetime_end) &
-        ((df['Окончание'] >= target_datetime_start) | df['Окончание'].isna())
-    )
-    
-    # Добавляем фильтр по названию если колонка существует
-    if 'Название' in df.columns:
-        name_filter = ~(df['Название'].astype(str).str.strip().str.lower() == 'nan')
-        filtered_df = df[time_filter & name_filter].copy()
-        logger.info(f"🔍 Исключены проблемы с названием 'nan'")
-    else:
-        filtered_df = df[time_filter].copy()
+    # 1. Дата в колонке "ДатаБезВремени" совпадает с указанной датой
+    # 2. Исключаем проблемы с регионом 'nan' (отсутствующий регион)
+    date_filter = df['ДатаБезВремени'].astype(str) == target_date_str
+    region_filter = ~(df['Регион'].astype(str).str.strip().str.lower() == 'nan')
 
-    logger.info(f"📊 Найдено {len(filtered_df)} проблем активных в дату {target_date.strftime('%d.%m.%Y')}")
+    filtered_df = df[date_filter & region_filter].copy()
+    logger.info(f"🔍 Исключены проблемы с регионом 'nan'")
+
+    logger.info(f"📊 Найдено {len(filtered_df)} проблем для даты {target_date.strftime('%d.%m.%Y')}")
 
     if len(filtered_df) == 0:
         logger.warning(f"⚠️ Не найдено проблем для даты {target_date.strftime('%d.%m.%Y')}")
     else:
         logger.info(f"✅ Проблемы для обработки:")
         for idx, row in filtered_df.iterrows():
-            start_str = row['Старт'].strftime('%d.%m.%Y %H:%M') if pd.notna(row['Старт']) else 'N/A'
-            end_str = row['Окончание'].strftime('%d.%m.%Y %H:%M') if pd.notna(row['Окончание']) else 'N/A'
-            logger.info(f"   📋 {row['Номер массовой']} - {row['Регион']}: {start_str} → {end_str}")
+            date_str = row['ДатаБезВремени'] if pd.notna(row['ДатаБезВремени']) else 'N/A'
+            logger.info(f"   📋 {row['Номер массовой']} - {row['Регион']} (дата: {date_str})")
 
     return filtered_df
 
@@ -141,7 +150,7 @@ def save_results_to_excel(
     try:
         # Загружаем рабочую книгу
         workbook = load_workbook(original_file_path)
-        
+
         # Создаем или получаем лист для результатов
         sheet_name = f"Результаты_{target_date.strftime('%d_%m_%Y')}"
         if sheet_name in workbook.sheetnames:
@@ -157,7 +166,7 @@ def save_results_to_excel(
             for col in range(1, report_sheet.max_column + 1):
                 cell_value = report_sheet.cell(row=1, column=col).value
                 result_sheet.cell(row=1, column=col, value=cell_value)
-            
+
             # Добавляем колонку "потерянные"
             lost_col = report_sheet.max_column + 1
             result_sheet.cell(row=1, column=lost_col, value="потерянные")
@@ -223,8 +232,87 @@ def save_results_to_excel(
 
     except Exception as e:
         logger.error(f"❌ Ошибка при сохранении результатов: {e}")
-        logger.info(f"📝 Обновлено {updated_rows} строк в таблице '{table_name}'")
+
+
+def save_single_result_to_original_file(
+    mass_number: str,
+    lost_calls: int,
+    excess_traffic: float,
+    original_file_path: Path,
+    row_index: int
+) -> None:
+    """
+    Сохраняет результат одной строки в исходный Excel файл.
+    Добавляет колонки "Потерянные" и "Полученные" если их нет.
+
+    Args:
+        mass_number: Номер массового инцидента
+        lost_calls: Количество потерянных звонков
+        excess_traffic: Коэффициент превышения трафика (сохраняется как "Полученные")
+        original_file_path: Путь к исходному Excel файлу
+        row_index: Индекс строки в исходном файле
+    """
+    logger.info(f"💾 Сохраняем результат для {mass_number}: lost={lost_calls}, excess={excess_traffic}")
+
+    try:
+        # Загружаем рабочую книгу
+        workbook = load_workbook(original_file_path)
+        report_sheet = workbook["Отчет"]
+
+        # Проверяем есть ли колонки "Потерянные" и "Полученные"
+        lost_col = None
+        received_col = None
+
+        for col in range(1, report_sheet.max_column + 1):
+            header = report_sheet.cell(row=1, column=col).value
+            if header and "потерянные" in str(header).lower():
+                lost_col = col
+            elif header and "полученные" in str(header).lower():
+                received_col = col
+
+        # Если колонок нет, добавляем их
+        if lost_col is None:
+            lost_col = report_sheet.max_column + 1
+            report_sheet.cell(row=1, column=lost_col, value="Потерянные")
+            logger.info(f"➕ Добавлена колонка 'Потерянные' в позицию {lost_col}")
+
+        if received_col is None:
+            received_col = report_sheet.max_column + 1
+            report_sheet.cell(row=1, column=received_col, value="Полученные")
+            logger.info(f"➕ Добавлена колонка 'Полученные' в позицию {received_col}")
+
+        # Находим строку с нужным номером массовой
+        mass_number_col = None
+        for col in range(1, report_sheet.max_column + 1):
+            header = report_sheet.cell(row=1, column=col).value
+            if header and "номер" in str(header).lower() and "массовой" in str(header).lower():
+                mass_number_col = col
+                break
+
+        if mass_number_col is None:
+            logger.error("❌ Не найдена колонка с номером массовой")
+            return
+
+        # Ищем строку с нужным номером массовой
+        target_row = None
+        for row in range(2, report_sheet.max_row + 1):
+            cell_value = report_sheet.cell(row=row, column=mass_number_col).value
+            if str(cell_value) == str(mass_number):
+                target_row = row
+                break
+
+        if target_row is None:
+            logger.error(f"❌ Не найдена строка с номером массовой {mass_number}")
+            return
+
+        # Записываем результаты
+        report_sheet.cell(row=target_row, column=lost_col, value=lost_calls)
+        report_sheet.cell(row=target_row, column=received_col, value=excess_traffic)
+
+        # Сохраняем файл
+        workbook.save(original_file_path)
+        logger.info(f"✅ Результат сохранен в строку {target_row}: {mass_number} → lost={lost_calls}, received={excess_traffic}")
 
     except Exception as e:
-        logger.error(f"❌ Ошибка при сохранении в Excel: {e}")
+        logger.error(f"❌ Ошибка при сохранении результата для {mass_number}: {e}")
         raise
