@@ -6,13 +6,13 @@ wfm_single.py — Рефакторированная версия скрипта
 
 1. НОВЫЙ РЕЖИМ (рекомендуется) - автоматическое определение даты из первой строки:
    python main.py ваш_файл.xlsx --auto-date-processing
-   
+
 2. НОВЫЙ РЕЖИМ с дополнительными опциями:
    python main.py ваш_файл.xlsx --auto-date-processing --with-skills --no-headless
-   
+
 3. СТАНДАРТНЫЙ РЕЖИМ - обработка всех проблем:
    python main.py ваш_файл.xlsx --out-csv result.csv --no-headless
-   
+
 4. СТАНДАРТНЫЙ РЕЖИМ с навыками:
    python main.py ваш_файл.xlsx --with-skills --no-headless
 
@@ -105,6 +105,7 @@ def main():
         logger.info("🆕 Включен новый режим автоматической обработки по дате")
         logger.info("📅 Дата будет автоматически определена из первой строки данных")
         logger.info("💾 Результаты будут сохранены в исходный Excel файл")
+        logger.info("⚠️ ВАЖНО: Убедитесь, что файл {input_xlsx_path.name} закрыт в Excel перед запуском!")
     else:
         logger.info("📋 Используется стандартный режим работы (обработка всех проблем)")
 
@@ -194,13 +195,26 @@ def main():
                     lost, excess = calc_metrics(xlsx_path)
 
                     # Сохраняем результат сразу в исходный файл
-                    save_single_result_to_original_file(
-                        mass_number=mass_number,
-                        lost_calls=lost,
-                        excess_traffic=excess,
-                        original_file_path=input_xlsx_path,
-                        row_index=idx
-                    )
+                    try:
+                        save_single_result_to_original_file(
+                            mass_number=mass_number,
+                            lost_calls=lost,
+                            excess_traffic=excess,
+                            original_file_path=input_xlsx_path,
+                            row_index=idx
+                        )
+                        logger.info(f"✅ Результат сохранен в файл: {mass_number} → lost={lost}, excess={excess}")
+                    except PermissionError as pe:
+                        logger.error(f"❌ ОШИБКА ДОСТУПА: Файл {input_xlsx_path} открыт в Excel или заблокирован")
+                        logger.error(f"   Закройте файл в Excel и попробуйте снова")
+                        logger.error(f"   Детали: {pe}")
+                        # Продолжаем выполнение, но не добавляем в results
+                        continue
+                    except Exception as save_exc:
+                        logger.error(f"❌ ОШИБКА СОХРАНЕНИЯ для {mass_number}: {save_exc}")
+                        logger.error(f"   Продолжаем выполнение без сохранения в файл")
+                        # Продолжаем выполнение, но не добавляем в results
+                        continue
 
                     # Создаем запись результата для возможного сохранения в CSV
                     result = create_result_record(

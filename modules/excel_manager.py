@@ -101,7 +101,7 @@ def filter_problems_by_date(df: pd.DataFrame, target_date: date) -> pd.DataFrame
 
         # Создаем фильтр по дате
     date_filter = normalized_dates == target_date_str
-    
+
     # Применяем фильтр по дате
     filtered_df = df[date_filter].copy()
     logger.info(f"📊 Найдено {len(filtered_df)} проблем для даты {target_date.strftime('%d.%m.%Y')}")
@@ -344,8 +344,19 @@ def save_single_result_to_original_file(
         report_sheet.cell(row=target_row, column=received_col, value=excess_traffic)
 
         # Сохраняем файл
-        workbook.save(original_file_path)
-        logger.info(f"✅ Результат сохранен в строку {target_row}: {mass_number} → lost={lost_calls}, received={excess_traffic}")
+        try:
+            workbook.save(original_file_path)
+            logger.info(f"✅ Результат сохранен в строку {target_row}: {mass_number} → lost={lost_calls}, received={excess_traffic}")
+        except PermissionError as pe:
+            logger.error(f"❌ ОШИБКА ДОСТУПА: Файл {original_file_path} заблокирован")
+            logger.error(f"   Возможные причины:")
+            logger.error(f"   - Файл открыт в Excel")
+            logger.error(f"   - Файл открыт в другой программе")
+            logger.error(f"   - Недостаточно прав доступа")
+            raise pe
+        except Exception as save_e:
+            logger.error(f"❌ Ошибка при сохранении файла: {save_e}")
+            raise save_e
 
     except Exception as e:
         logger.error(f"❌ Ошибка при сохранении результата для {mass_number}: {e}")
