@@ -65,7 +65,7 @@ def filter_problems_by_date(df: pd.DataFrame, target_date: date) -> pd.DataFrame
 
     # Преобразуем target_date в строку для сравнения
     target_date_str = target_date.strftime('%d.%m.%Y')
-    
+
     # ОТЛАДКА: Показываем первые несколько значений дат
     logger.info(f"🔍 Ищем дату: '{target_date_str}'")
     logger.info(f"🔍 Первые 5 значений в колонке 'ДатаБезВремени':")
@@ -77,7 +77,7 @@ def filter_problems_by_date(df: pd.DataFrame, target_date: date) -> pd.DataFrame
         """Нормализует дату к строковому формату DD.MM.YYYY"""
         if pd.isna(date_val):
             return None
-        
+
         try:
             if isinstance(date_val, str):
                 # Если это строка, пробуем распарсить
@@ -98,17 +98,12 @@ def filter_problems_by_date(df: pd.DataFrame, target_date: date) -> pd.DataFrame
 
     # Нормализуем даты в DataFrame
     normalized_dates = df['ДатаБезВремени'].apply(normalize_date)
-    
-    # Создаем фильтр по дате
+
+        # Создаем фильтр по дате
     date_filter = normalized_dates == target_date_str
     
-    # Фильтр по региону (исключаем 'nan')
-    region_filter = ~(df['Регион'].astype(str).str.strip().str.lower() == 'nan')
-
-    # Применяем оба фильтра
-    filtered_df = df[date_filter & region_filter].copy()
-    
-    logger.info(f"🔍 Исключены проблемы с регионом 'nan'")
+    # Применяем фильтр по дате
+    filtered_df = df[date_filter].copy()
     logger.info(f"📊 Найдено {len(filtered_df)} проблем для даты {target_date.strftime('%d.%m.%Y')}")
 
     if len(filtered_df) == 0:
