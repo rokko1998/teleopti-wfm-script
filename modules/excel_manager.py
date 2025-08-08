@@ -128,115 +128,101 @@ def save_results_to_excel(
     target_date: date
 ) -> None:
     """
-    Сохраняет результаты в исходный Excel файл в таблицу "Свод_по_заметкам" в колонку "потерянные".
+    Сохраняет результаты в отдельный лист Excel файла.
+    Создает новый лист с полной таблицей как в исходных данных + колонка "потерянные".
 
     Args:
         results: Список результатов
         original_file_path: Путь к исходному Excel файлу
         target_date: Дата для которой были получены результаты
     """
-    logger.info(f"💾 Сохраняем результаты в исходный файл: {original_file_path}")
+    logger.info(f"💾 Сохраняем результаты в отдельный лист: {original_file_path}")
 
     try:
         # Загружаем рабочую книгу
         workbook = load_workbook(original_file_path)
+        
+        # Создаем или получаем лист для результатов
+        sheet_name = f"Результаты_{target_date.strftime('%d_%m_%Y')}"
+        if sheet_name in workbook.sheetnames:
+            result_sheet = workbook[sheet_name]
+        else:
+            result_sheet = workbook.create_sheet(sheet_name)
+            logger.info(f"📋 Создан новый лист: {sheet_name}")
 
-        # Ищем лист "Отчет"
-        if "Отчет" not in workbook.sheetnames:
-            logger.error("❌ Лист 'Отчет' не найден в файле")
-            return
+        # Если лист новый, копируем заголовки из исходного листа "Отчет"
+        if result_sheet.max_row == 1 and result_sheet.max_column == 1:
+            # Копируем заголовки из листа "Отчет"
+            report_sheet = workbook["Отчет"]
+            for col in range(1, report_sheet.max_column + 1):
+                cell_value = report_sheet.cell(row=1, column=col).value
+                result_sheet.cell(row=1, column=col, value=cell_value)
+            
+            # Добавляем колонку "потерянные"
+            lost_col = report_sheet.max_column + 1
+            result_sheet.cell(row=1, column=lost_col, value="потерянные")
+            logger.info(f"📋 Скопированы заголовки и добавлена колонка 'потерянные'")
 
-        report_sheet = workbook["Отчет"]
-
-        # Ищем таблицу "Свод_по_заметкам"
-        table_name = "Свод_по_заметкам"
-        table = None
-
-        for table_obj in report_sheet.tables.values():
-            if table_obj.name == table_name:
-                table = table_obj
+        # Находим колонку с номером массовой
+        mass_number_col = None
+        for col in range(1, result_sheet.max_column + 1):
+            header = result_sheet.cell(row=1, column=col).value
+            if header and "номер" in str(header).lower() and "массовой" in str(header).lower():
+                mass_number_col = col
                 break
 
-        if not table:
-            logger.error(f"❌ Таблица '{table_name}' не найдена на листе 'Отчет'")
+        if mass_number_col is None:
+            logger.error("❌ Не найдена колонка с номером массовой")
             return
 
-        # Получаем диапазон таблицы
-        table_range = table.ref
-        logger.info(f"📊 Найдена таблица '{table_name}' в диапазоне {table_range}")
-
-        # Читаем данные таблицы
-        table_data = []
-        for row in report_sheet[table_range]:
-            table_data.append([cell.value for cell in row])
-
-        # Находим заголовки
-        headers = table_data[0]
-        logger.info(f"📋 Заголовки таблицы: {headers}")
-
-        # Проверяем есть ли колонка "потерянные"
-        lost_column_idx = None
-        for i, header in enumerate(headers):
-            if header and "потерянные" in str(header).lower():
-                lost_column_idx = i
-                break
-
-        if lost_column_idx is None:
-            # Добавляем новую колонку "потерянные" в конец
-            lost_column_idx = len(headers)
-            headers.append("потерянные")
-            logger.info(f"➕ Добавлена новая колонка 'потерянные' в позицию {lost_column_idx}")
-
-        # Создаем словарь для быстрого поиска результатов по номеру массовой
+        # Создаем словарь результатов
         results_dict = {}
         for result in results:
             mass_number = result["Номер массовой"]
             lost_calls = result["LostCalls"]
             results_dict[mass_number] = lost_calls
 
-        # Находим колонку с номером массовой
-        mass_number_col_idx = None
-        for i, header in enumerate(headers):
-            if header and "номер" in str(header).lower() and "массовой" in str(header).lower():
-                mass_number_col_idx = i
-                break
+        # Обрабатываем каждый результат
+        for mass_number, lost_calls in results_dict.items():
+            # Ищем строку с нужным номером массовой
+            target_row = None
+            for row in range(2, result_sheet.max_row + 1):
+                cell_value = result_sheet.cell(row=row, column=mass_number_col).value
+                if str(cell_value) == str(mass_number):
+                    target_row = row
+                    break
 
-        if mass_number_col_idx is None:
-            logger.error("❌ Не найдена колонка с номером массовой в таблице")
-            return
+            if target_row is None:
+                # Добавляем новую строку
+                target_row = result_sheet.max_row + 1
+                logger.info(f"➕ Добавлена новая строка {target_row} для {mass_number}")
 
-        # Заполняем данные
-        updated_rows = 0
-        for row_idx, row_data in enumerate(table_data[1:], start=2):  # Пропускаем заголовок
-            if len(row_data) <= mass_number_col_idx:
-                continue
+            # Копируем данные из исходного листа "Отчет"
+            report_sheet = workbook["Отчет"]
+            report_row = None
+            for row in range(2, report_sheet.max_row + 1):
+                cell_value = report_sheet.cell(row=row, column=mass_number_col).value
+                if str(cell_value) == str(mass_number):
+                    report_row = row
+                    break
 
-            mass_number = row_data[mass_number_col_idx]
-            if mass_number in results_dict:
-                # Расширяем строку если нужно
-                while len(row_data) <= lost_column_idx:
-                    row_data.append(None)
+            if report_row:
+                # Копируем все данные из исходной строки
+                for col in range(1, report_sheet.max_column + 1):
+                    cell_value = report_sheet.cell(row=report_row, column=col).value
+                    result_sheet.cell(row=target_row, column=col, value=cell_value)
 
-                row_data[lost_column_idx] = results_dict[mass_number]
-                updated_rows += 1
-                logger.info(f"✅ Обновлена строка для {mass_number}: потерянные = {results_dict[mass_number]}")
-
-        # Записываем обновленные данные обратно в таблицу
-        for row_idx, row_data in enumerate(table_data):
-            for col_idx, value in enumerate(row_data):
-                cell = report_sheet.cell(row=row_idx + 1, column=col_idx + 1)
-                cell.value = value
-
-        # Обновляем диапазон таблицы если добавили колонку
-        if lost_column_idx >= len(headers) - 1:
-            # Нужно обновить диапазон таблицы
-            new_range = f"{table_range.split(':')[0]}:{chr(ord('A') + lost_column_idx)}{table_range.split(':')[1].split(':')[1]}"
-            table.ref = new_range
-            logger.info(f"📊 Обновлен диапазон таблицы: {new_range}")
+            # Записываем результат в колонку "потерянные"
+            lost_col = result_sheet.max_column
+            result_sheet.cell(row=target_row, column=lost_col, value=lost_calls)
+            logger.info(f"✅ Сохранен результат: {mass_number} → {lost_calls}")
 
         # Сохраняем файл
         workbook.save(original_file_path)
-        logger.success(f"✅ Результаты успешно сохранены в файл {original_file_path}")
+        logger.info(f"💾 Все результаты сохранены в лист '{sheet_name}'")
+
+    except Exception as e:
+        logger.error(f"❌ Ошибка при сохранении результатов: {e}")
         logger.info(f"📝 Обновлено {updated_rows} строк в таблице '{table_name}'")
 
     except Exception as e:
