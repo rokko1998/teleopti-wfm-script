@@ -11,7 +11,11 @@ from loguru import logger
 
 def calc_metrics(path: Path) -> Tuple[int, float]:
     """
-    Читает 2‑й лист отчёта и возвращает (lost, excess).
+    Читает 2‑й лист скачанного отчёта и возвращает агрегаты по формуле из Excel:
+    - Потерянные над прогнозом: sum(max(0, Calc - max(Fcst, Answered))) только по строкам периода
+    - Превышение: sum(Calc - Fcst) / sum(Fcst) только по строкам периода
+
+    Игнорируем строки с "Итого:" и любые не-временные строки в колонке "Период".
 
     Args:
         path: Путь к Excel файлу с отчетом
@@ -19,20 +23,43 @@ def calc_metrics(path: Path) -> Tuple[int, float]:
     Returns:
         Tuple[int, float]: (lost_calls, excess_traffic)
     """
-    df = pd.read_excel(path, sheet_name=1, header=4)  # строка 5 = header
-    df.columns = [c.strip() for c in df.columns]
+    # Лист 2, заголовки на 5-й строке (0‑индекс 4)
+    df = pd.read_excel(path, sheet_name=1, header=4)
+    df.columns = [str(c).strip() for c in df.columns]
 
-    calc = df["Расчетные звонки"].fillna(0)
-    fcst = df["Спрогнозированные звонки"].fillna(0)
-    answ = df["Отвеченные звонки"].fillna(0)
+    # Проверяем ключевые колонки
+    required = ["Период", "Расчетные звонки", "Спрогнозированные звонки", "Отвеченные звонки"]
+    for col in required:
+        if col not in df.columns:
+            raise ValueError(f"В отчете отсутствует колонка '{col}'. Найдены: {list(df.columns)}")
 
-    lost = np.where(
+    # Фильтруем только детальные строки периода (hh:mm:ss), исключая 'Итого:'
+    period_str = df["Период"].astype(str).str.strip()
+    is_time_row = period_str.str.match(r"^\d{2}:\d{2}:\d{2}$")
+    not_total = ~period_str.str.contains("итого", case=False, na=False)
+    mask = is_time_row & not_total
+
+    # Берем только нужные строки
+    df_sel = df.loc[mask].copy()
+
+    # Числовые колонки
+    calc = pd.to_numeric(df_sel["Расчетные звонки"], errors="coerce").fillna(0)
+    fcst = pd.to_numeric(df_sel["Спрогнозированные звонки"], errors="coerce").fillna(0)
+    answ = pd.to_numeric(df_sel["Отвеченные звонки"], errors="coerce").fillna(0)
+
+    # Потерянные по строкам: IF(Calc>Fcst; IF(Answered>Fcst; Calc-Answered; Calc-Fcst); 0)
+    lost_per_row = np.where(
         calc > fcst,
         np.where(answ > fcst, calc - answ, calc - fcst),
         0,
-    ).sum()
-    excess = ((calc - fcst).sum()) / fcst.sum() if fcst.sum() else 0
-    return int(lost), round(float(excess), 4)
+    )
+    lost_total = int(np.nansum(lost_per_row))
+
+    # Превышение: отношение суммарного превышения расчетных над прогнозом к сумме прогноза
+    fcst_sum = float(fcst.sum())
+    excess_total = float(((calc - fcst).sum()) / fcst_sum) if fcst_sum else 0.0
+
+    return lost_total, round(excess_total, 4)
 
 
 def prepare_excel_data(input_xlsx_path: Path) -> pd.DataFrame:
