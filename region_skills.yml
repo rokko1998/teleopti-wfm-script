@@ -86,7 +86,7 @@ skills:
   РВД 611:
     - "379"
   Телефон 611:
-    - "646"
+    - "380"  # исправлено по списку workload params
   Voxys B2C:
     - "883"
   LowPrioritySPB:
@@ -169,7 +169,7 @@ regions:
   Ростов-на-Дону:
     - "372"  # Rostov
   Москва:
-    - "167"  # Msk
+    - "156"  # Moscow (исправлено по списку workload params)
   Казань:
     - "303"  # Kazan'
   Кемерово:
