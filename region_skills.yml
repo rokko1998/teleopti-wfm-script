@@ -135,7 +135,7 @@ regions:
   Саранск:
     - "429"  # Saransk
   Саратов:
-    - "429"  # Saratov (временно используем тот же ID что у Саранска)
+    - "387"  # Saratov
   Смоленск:
     - "415"  # Smolensk
   Санкт-Петербург:
@@ -171,77 +171,77 @@ regions:
   Москва:
     - "156"  # Moscow (исправлено по списку workload params)
   Казань:
-    - "303"  # Kazan'
+    - "410"  # Kazan'
   Кемерово:
-    - "521"  # Kemerovo
+    - "435"  # Kemerovo
   Ханты-Мансийск:
-    - "382"  # Khanty-Mansiysk
+    - "237"  # Khanty-Mansiysk
   Киров:
-    - "422"  # Kirov_sar
+    - "551"  # Kirov_sar
   Коми:
-    - "313"  # Komi
+    - "285"  # Komi
   Кострома:
-    - "410"  # Kostroma
+    - "424"  # Kostroma
   Краснодар:
-    - "435"  # Krasnodar
+    - "370"  # Krasnodar
   Красноярск:
-    - "237"  # Krasnoyarsk
+    - "305"  # Krasnoyarsk
   Курган:
-    - "551"  # Kurgan
+    - "235"  # Kurgan
   Курск:
-    - "285"  # Kursk
+    - "378"  # Kursk
   Липецк:
-    - "296"  # Lipetsk
+    - "379"  # Lipetsk
   Магадан:
-    - "898"  # Magadan
+    - "314"  # Magadan
   Мурманск:
-    - "424"  # Murmansk
+    - "383"  # Murmansk
   Нижний Новгород:
-    - "370"  # NNovgorod
+    - "413"  # NNovgorod
   Норильск:
-    - "305"  # Noril'sk
+    - "315"  # Noril'sk
   Новосибирск:
-    - "235"  # Novosibirsk
+    - "306"  # Novosibirsk
   Омск:
-    - "378"  # Omsk
+    - "431"  # Omsk
   Орел:
-    - "379"  # Orel
+    - "384"  # Orel
   Оренбург:
-    - "839"  # Orenburg
+    - "233"  # Orenburg
   Пенза:
-    - "815"  # Penza_sar
+    - "584"  # Penza_sar
   Пермь:
-    - "813"  # Perm
+    - "227"  # Perm
   Петрозаводск:
-    - "811"  # Petrozavodsk
+    - "385"  # Petrozavodsk
   Псков:
-    - "814"  # Pskov
+    - "386"  # Pskov
   Рязань:
-    - "895"  # Ryazan'
+    - "427"  # Ryazan'
   Сахалин:
     - "314"  # Sakhalin
   Салехард:
-    - "476"  # Salekhard
+    - "236"  # Salekhard
   Самара:
-    - "808"  # Samara
+    - "432"  # Samara
   Йошкар-Ола:
-    - "825"  # Yoshkar-Ola_sar
+    - "554"  # Yoshkar-Ola_sar
   Ижевск:
-    - "383"  # Igevsk
+    - "524"  # Igevsk
   Иркутск:
-    - "413"  # Irkutsk
+    - "303"  # Irkutsk
   Иваново:
-    - "315"  # Ivanovo
+    - "521"  # Ivanovo
   Калининград:
-    - "306"  # Kaliningrad
+    - "382"  # Kaliningrad
   Калуга:
-    - "431"  # Kaluga
+    - "422"  # Kaluga
   Камчатка:
-    - "384"  # Kamchatka
+    - "313"  # Kamchatka
   Горно-Алтайск:
-    - "233"  # Gorno-Altaysk
+    - "638"  # Gorno-Altaysk
   Великий Новгород:
-    - "433"  # V.Novgorod
+    - "389"  # V.Novgorod
 
   # Специальные регионы и навыки
   Help_611:
