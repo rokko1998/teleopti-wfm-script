@@ -50,6 +50,36 @@ def get_date_from_first_row(df: pd.DataFrame) -> date:
     return first_date
 
 
+def get_date_from_row_first_cell(row: pd.Series) -> date:
+    """
+    Возвращает дату для конкретной строки, беря её из первой ячейки строки.
+    Если в данных присутствует колонка "ДатаБезВремени" — используем её.
+    В противном случае берём значение из первого столбца по позиции.
+
+    Args:
+        row: Строка данных (pd.Series)
+
+    Returns:
+        date: Дата, полученная из строки
+    """
+    try:
+        date_value = row["ДатаБезВремени"] if "ДатаБезВремени" in row.index else row.iloc[0]
+
+        if pd.isna(date_value) or str(date_value).strip() == "":
+            raise ValueError("Пустое значение даты в строке")
+
+        if isinstance(date_value, str):
+            return datetime.strptime(date_value.strip(), "%d.%m.%Y").date()
+        if isinstance(date_value, datetime):
+            return date_value.date()
+
+        # Универсальный парсинг, если тип неожиданен
+        return pd.to_datetime(date_value).date()
+    except Exception as e:
+        logger.error(f"❌ Не удалось извлечь дату из первой ячейки строки: {e}")
+        raise
+
+
 def filter_problems_by_date(df: pd.DataFrame, target_date: date) -> pd.DataFrame:
     """
     Фильтрует проблемы по дате из колонки "ДатаБезВремени".
