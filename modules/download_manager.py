@@ -247,70 +247,23 @@ def download_report(
     # ДОПОЛНИТЕЛЬНО: Повторно применяем CDP настройки на странице отчета
     apply_cdp_download_settings(driver)
 
-    # Ждем полной загрузки страницы с улучшенной логикой
-    wait = WebDriverWait(driver, 5)
-    logger.info("⏳ Ждем загрузки страницы...")
+    # Устойчивое ожидание появления ключевых элементов формы (без перезагрузок)
+    wait = WebDriverWait(driver, 30)
+    logger.info("⏳ Ждем загрузки страницы отчета (до 30с)...")
+    try:
+        wait.until(
+            lambda d: (
+                len(d.find_elements(By.ID, "buttonShowExcel")) > 0
+                or len(d.find_elements(By.XPATH, "//td[contains(normalize-space(.),'Дата от')]/following-sibling::td//input[@type='text']")) > 0
+                or len(d.find_elements(By.XPATH, "//input[@type='text' and (contains(@id,'date') or contains(@class,'date'))]")) > 0
+                or len(d.find_elements(By.TAG_NAME, "table")) > 0
+            )
+        )
+        logger.info("✅ Страница загружена (обнаружены элементы отчета)")
+    except Exception:
+        logger.warning("⚠️ Не удалось подтвердить загрузку формы по ключевым элементам за 30с — продолжаем")
 
-    # Проверяем что страница загрузилась по специфичным элементам формы
-    form_loaded = False
-    for attempt in range(3):  # 3 попытки
-        try:
-            # Пробуем найти конкретные элементы формы отчета
-            wait_conditions = [
-                # Поле "Дата от"
-                (By.XPATH, "//td[contains(normalize-space(.), 'Дата от')]/following-sibling::td//input[@type='text']"),
-                # Любое поле ввода даты
-                (By.XPATH, "//input[@type='text' and contains(@id, 'date') or contains(@class, 'date')]"),
-                # Таблица с параметрами
-                (By.XPATH, "//table//td[contains(., 'Дата')]"),
-                # Любая таблица (последний резерв)
-                (By.TAG_NAME, "table")
-            ]
-
-            for by_type, selector in wait_conditions:
-                try:
-                    wait.until(EC.presence_of_element_located((by_type, selector)))
-                    logger.info(f"✅ Страница загружена (найден элемент: {selector})")
-                    form_loaded = True
-                    break
-                except:
-                    continue
-
-            if form_loaded:
-                break
-            else:
-                logger.warning(f"⚠️ Попытка {attempt + 1}/3: Форма не загрузилась, обновляем страницу...")
-                driver.refresh()
-                time.sleep(3)
-
-        except Exception as e:
-            logger.warning(f"⚠️ Попытка {attempt + 1}/3 загрузки не удалась: {e}")
-            if attempt < 2:  # Не последняя попытка
-                logger.info("🔄 Обновляем страницу и пробуем снова...")
-                driver.refresh()
-                time.sleep(3)
-
-    if not form_loaded:
-        logger.error(f"❌ Страница не загрузилась после 3 попыток")
-        # Показываем что есть на странице
-        try:
-            page_text = driver.find_element(By.TAG_NAME, "body").text[:500]
-            logger.info(f"📄 Содержимое страницы: {page_text}")
-        except:
-            pass
-
-        # Попробуем перезагрузить страницу еще раз
-        logger.info("🔄 Последняя попытка: полная перезагрузка страницы...")
-        driver.get(REPORT_URL)
-        time.sleep(5)
-
-        try:
-            wait.until(EC.presence_of_element_located((By.TAG_NAME, "table")))
-            logger.info("✅ Страница загружена после перезагрузки")
-        except:
-            raise Exception("Страница отчета не загружается - возможно проблемы с сервером")
-
-    time.sleep(2)  # Дополнительная пауза для полной загрузки
+    time.sleep(1)  # Небольшая пауза для стабильности
 
     # --- 1) даты / время -------------------------------------------------------
     setup_date_range(driver, start_dt, end_dt)
