@@ -83,11 +83,19 @@ def parse_datetime_columns(df: pd.DataFrame) -> pd.DataFrame:
         df["Окончание"] = pd.to_datetime(df["Окончание"], errors='coerce')
 
     # Проверяем на наличие некорректных дат
-    invalid_dates = df[df["Старт"].isna() | df["Окончание"].isna()]
-    if not invalid_dates.empty:
-        logger.warning(f"Найдено {len(invalid_dates)} строк с некорректными датами")
-        logger.warning(f"Строки с проблемами: {invalid_dates[['Номер массовой', 'Старт', 'Окончание']].to_dict('records')}")
-        df = df.dropna(subset=["Старт", "Окончание"])
+    # ВАЖНО: допускаем пустое "Окончание" (незакрытые проблемы). Отбрасываем только без "Старт".
+    invalid_start = df[df["Старт"].isna()]
+    if not invalid_start.empty:
+        logger.warning(f"Найдено {len(invalid_start)} строк без даты 'Старт' — будут исключены")
+        logger.warning(
+            f"Строки с проблемами: {invalid_start[['Номер массовой', 'Старт', 'Окончание']].to_dict('records')}"
+        )
+        df = df.dropna(subset=["Старт"]).copy()
+
+    # Информируем о пустых 'Окончание', но НЕ исключаем их
+    open_issues = df[df["Окончание"].isna()]
+    if not open_issues.empty:
+        logger.info(f"Обнаружено {len(open_issues)} строк без 'Окончание' — считаем их открытыми и обрабатываем")
 
     return df
 
