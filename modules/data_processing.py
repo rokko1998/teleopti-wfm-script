@@ -8,32 +8,43 @@ import pandas as pd
 import numpy as np
 from loguru import logger
 
-
 def calc_metrics(path: Path) -> Tuple[int, float]:
     """
-    Читает 2‑й лист отчёта и возвращает (lost, excess).
-
-    Args:
-        path: Путь к Excel файлу с отчетом
-
-    Returns:
-        Tuple[int, float]: (lost_calls, excess_traffic)
+    Читает 2-й лист отчёта и возвращает (lost, excess),
+    исключая строки 'Итого:' и любые строки, где в 'Период' не время.
     """
-    df = pd.read_excel(path, sheet_name=1, header=4)  # строка 5 = header
+    df = pd.read_excel(path, sheet_name=1, header=4)  # заголовки на 5-й строке
     df.columns = [c.strip() for c in df.columns]
 
-    calc = df["Расчетные звонки"].fillna(0)
-    fcst = df["Спрогнозированные звонки"].fillna(0)
-    answ = df["Отвеченные звонки"].fillna(0)
+    # 1) Убираем строку ИТОГО и прочий «мусор» в периоде
+    if "Период" in df.columns:
+        mask_total = df["Период"].astype(str).str.contains("итого", case=False, na=False)
+        df = df[~mask_total].copy()
 
-    lost = np.where(
-        calc > fcst,
-        np.where(answ > fcst, calc - answ, calc - fcst),
-        0,
-    ).sum()
-    excess = ((calc - fcst).sum()) / fcst.sum() if fcst.sum() else 0
-    return int(lost), round(float(excess), 4)
+    # 2) Приводим к числам (если вдруг были строки/пробелы) и заполняем NaN
+    cols = ["Расчетные звонки", "Спрогнозированные звонки", "Отвеченные звонки"]
+    for c in cols:
+        df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
 
+    calc = df["Расчетные звонки"].to_numpy()
+    fcst = df["Спрогнозированные звонки"].to_numpy()
+    answ = df["Отвеченные звонки"].to_numpy()
+
+    # 3) РЕАЛИЗАЦИЯ ТОЧНО КАК В ТВОЕЙ ФОРМУЛЕ ПО СТРОКЕ
+    lost_per_row = np.where(
+        (calc - fcst) > 0,
+        np.where((answ - fcst) > 0, calc - answ, (calc - answ) - (fcst - answ)),
+        0
+    )
+    # при желании можно подстраховаться от отрицательных: lost_per_row = np.maximum(lost_per_row, 0)
+
+    lost = int(lost_per_row.sum())
+
+    # 4) excess как раньше: суммарный (calc - fcst) / суммарный fcst
+    fcst_sum = fcst.sum()
+    excess = round(float(((calc - fcst).sum()) / fcst_sum), 4) if fcst_sum else 0.0
+
+    return lost, excess
 
 def prepare_excel_data(input_xlsx_path: Path) -> pd.DataFrame:
     """
