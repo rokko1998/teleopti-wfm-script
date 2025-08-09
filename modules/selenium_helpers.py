@@ -12,6 +12,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
+from selenium.common.exceptions import NoSuchFrameException
 
 
 # === Константы ===
@@ -261,3 +262,61 @@ def prepare_download_js(driver):
             window.chrome.downloads.setShelfEnabled(true);
         }
     """)
+
+
+def _frame_has_report_form(driver) -> bool:
+    """Проверяет, видны ли ключевые элементы формы отчета в текущем контексте."""
+    try:
+        if driver.find_elements(By.ID, "buttonShowExcel"):
+            return True
+        if driver.find_elements(By.XPATH, "//td[contains(normalize-space(.), 'Дата от')]/following-sibling::td//input[@type='text']"):
+            return True
+        if driver.find_elements(By.XPATH, "//input[@type='text' and (contains(@id,'date') or contains(@class,'date'))]"):
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def switch_to_report_frame(driver, timeout: int = 30) -> bool:
+    """
+    Пытается найти и активировать фрейм, в котором расположена форма отчета.
+    Возвращает True, если форма обнаружена (в текущем документе или во фрейме).
+    """
+    logger.info("🔎 Ищем фрейм с формой отчета (до 30с)...")
+    deadline = time.time() + timeout
+
+    while time.time() < deadline:
+        try:
+            # 1) Проверяем без фреймов
+            driver.switch_to.default_content()
+            if _frame_has_report_form(driver):
+                logger.info("✅ Форма отчета доступна без переключения фреймов")
+                return True
+
+            # 2) Перебираем все iframe/frame
+            frames = driver.find_elements(By.TAG_NAME, "iframe") + driver.find_elements(By.TAG_NAME, "frame")
+            for idx, fr in enumerate(frames):
+                try:
+                    driver.switch_to.default_content()
+                    driver.switch_to.frame(fr)
+                    if _frame_has_report_form(driver):
+                        logger.info(f"✅ Переключились во фрейм #{idx}, форма найдена")
+                        return True
+                except NoSuchFrameException:
+                    continue
+                except Exception:
+                    continue
+
+        except Exception:
+            pass
+
+        time.sleep(1)
+
+    logger.warning("⚠️ Не удалось найти форму отчета во фреймах за отведенное время")
+    # Возвращаемся в корневой контент на всякий случай
+    try:
+        driver.switch_to.default_content()
+    except Exception:
+        pass
+    return False

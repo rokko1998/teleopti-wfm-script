@@ -18,7 +18,8 @@ from .selenium_helpers import (
     wait_download,
     apply_cdp_download_settings,
     prepare_download_js,
-    REPORT_URL
+    REPORT_URL,
+    switch_to_report_frame,
 )
 from .date_time_utils import format_time_intervals, get_time_format_variations
 from .regions import setup_regions
@@ -247,21 +248,9 @@ def download_report(
     # ДОПОЛНИТЕЛЬНО: Повторно применяем CDP настройки на странице отчета
     apply_cdp_download_settings(driver)
 
-    # Устойчивое ожидание появления ключевых элементов формы (без перезагрузок)
-    wait = WebDriverWait(driver, 30)
+    # Переходим в правильный фрейм, если он используется
     logger.info("⏳ Ждем загрузки страницы отчета (до 30с)...")
-    try:
-        wait.until(
-            lambda d: (
-                len(d.find_elements(By.ID, "buttonShowExcel")) > 0
-                or len(d.find_elements(By.XPATH, "//td[contains(normalize-space(.),'Дата от')]/following-sibling::td//input[@type='text']")) > 0
-                or len(d.find_elements(By.XPATH, "//input[@type='text' and (contains(@id,'date') or contains(@class,'date'))]")) > 0
-                or len(d.find_elements(By.TAG_NAME, "table")) > 0
-            )
-        )
-        logger.info("✅ Страница загружена (обнаружены элементы отчета)")
-    except Exception:
-        logger.warning("⚠️ Не удалось подтвердить загрузку формы по ключевым элементам за 30с — продолжаем")
+    switch_to_report_frame(driver, timeout=30)
 
     time.sleep(1)  # Небольшая пауза для стабильности
 
