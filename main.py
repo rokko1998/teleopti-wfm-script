@@ -53,8 +53,7 @@ from modules.date_time_utils import windows_for_row, prepare_datetime_for_report
 from modules.skills import setup_skills, prepare_skills_from_config, show_page_diagnostics
 from modules.download_manager import download_report
 from modules.excel_manager import (
-    get_date_from_first_row,
-    filter_problems_by_date,
+    get_date_from_row_first_cell,
     calculate_time_window_for_date,
     save_single_result_to_original_file
 )
@@ -144,21 +143,22 @@ def main():
         logger.info("🚀 Начинаем обработку данных из Excel...")
 
         if use_auto_date_processing:
-            # Новый режим: автоматически определяем дату из первой строки данных
-            target_date = get_date_from_first_row(df)
-            df_to_process = filter_problems_by_date(df, target_date)
+            # Новый режим: обрабатываем все строки подряд,
+            # а дату берём из первой ячейки каждой строки
+            logger.info("🆕 Режим: дата берётся из каждой строки (первая ячейка)")
 
-            if len(df_to_process) == 0:
-                logger.warning("⚠️ Нет проблем для обработки в указанную дату")
-                return
+            # Обрабатываем каждую строку исходного DataFrame
+            for idx, row in df.iterrows():
+                # Дата для конкретной строки
+                try:
+                    target_date = get_date_from_row_first_cell(row)
+                except Exception:
+                    logger.warning(f"⚠️ Пропускаем строку #{idx}: не удалось извлечь дату из первой ячейки")
+                    continue
 
-            logger.info(f"📊 Найдено {len(df_to_process)} проблем для даты {target_date.strftime('%d.%m.%Y')}")
-
-            # Обрабатываем каждую строку из выбранного DataFrame
-            for idx, row in df_to_process.iterrows():
                 region = row["Регион"]
                 mass_number = row["Номер массовой"]
-                logger.info(f"🔄 Обрабатываем строку #{idx}: {mass_number} - {region}")
+                logger.info(f"🔄 Обрабатываем строку #{idx}: {mass_number} - {region} (дата: {target_date.strftime('%d.%m.%Y')})")
 
                 # Проверяем есть ли регион в конфигурации
                 if not validate_region_in_config(region, cfg):
@@ -172,7 +172,7 @@ def main():
                 logger.info(f"   Старт: {row['Старт']} (тип: {type(row['Старт'])})")
                 logger.info(f"   Окончание: {row['Окончание']} (тип: {type(row['Окончание'])})")
 
-                # Получаем временное окно для указанной даты
+                # Получаем временное окно для даты этой строки
                 win_start, win_end = calculate_time_window_for_date(row, target_date)
 
                 logger.info(f"🕒 Временное окно (исходное):")
@@ -194,7 +194,7 @@ def main():
                     logger.info(f"📊 Обрабатываем метрики из файла: {xlsx_path}")
                     lost, excess = calc_metrics(xlsx_path)
 
-                    # Сохраняем результат сразу в исходный файл
+                    # Сохраняем результат сразу в исходный файл (в ту же строку)
                     try:
                         save_single_result_to_original_file(
                             mass_number=mass_number,
