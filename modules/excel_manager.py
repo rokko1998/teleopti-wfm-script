@@ -201,10 +201,35 @@ def save_results_to_excel(
                 cell_value = report_sheet.cell(row=1, column=col).value
                 result_sheet.cell(row=1, column=col, value=cell_value)
 
-            # Добавляем колонку "потерянные"
-            lost_col = report_sheet.max_column + 1
-            result_sheet.cell(row=1, column=lost_col, value="потерянные")
-            logger.info(f"📋 Скопированы заголовки и добавлена колонка 'потерянные'")
+            # Проверяем есть ли уже колонки "Потерянные" и "Превышение"
+            lost_col = None
+            excess_col = None
+
+            for col in range(1, result_sheet.max_column + 1):
+                header = result_sheet.cell(row=1, column=col).value
+                if header:
+                    header_str = str(header).strip()
+                    if "потерянн" in header_str.lower():
+                        lost_col = col
+                    elif "превышен" in header_str.lower():
+                        excess_col = col
+
+            # Добавляем колонки только если их нет
+            if lost_col is None:
+                lost_col = result_sheet.max_column + 1
+                result_sheet.cell(row=1, column=lost_col, value="Потерянные")
+                logger.info(f"📋 Добавлена колонка 'Потерянные' в позицию {lost_col}")
+            else:
+                logger.info(f"📋 Найдена существующая колонка 'Потерянные' в позиции {lost_col}")
+
+            if excess_col is None:
+                excess_col = result_sheet.max_column + 1
+                result_sheet.cell(row=1, column=excess_col, value="Превышение")
+                logger.info(f"📋 Добавлена колонка 'Превышение' в позицию {excess_col}")
+            else:
+                logger.info(f"📋 Найдена существующая колонка 'Превышение' в позиции {excess_col}")
+
+            logger.info(f"📋 Скопированы заголовки и проверены колонки для результатов")
 
         # Находим колонку с номером массовой
         mass_number_col = None
@@ -223,10 +248,14 @@ def save_results_to_excel(
         for result in results:
             mass_number = result["Номер массовой"]
             lost_calls = result["LostCalls"]
-            results_dict[mass_number] = lost_calls
+            excess_traffic = result.get("ExcessTraffic", 0.0)  # Добавляем поддержку excess_traffic
+            results_dict[mass_number] = {"lost": lost_calls, "excess": excess_traffic}
 
         # Обрабатываем каждый результат
-        for mass_number, lost_calls in results_dict.items():
+        for mass_number, data in results_dict.items():
+            lost_calls = data["lost"]
+            excess_traffic = data["excess"]
+
             # Ищем строку с нужным номером массовой
             target_row = None
             for row in range(2, result_sheet.max_row + 1):
@@ -255,10 +284,13 @@ def save_results_to_excel(
                     cell_value = report_sheet.cell(row=report_row, column=col).value
                     result_sheet.cell(row=target_row, column=col, value=cell_value)
 
-            # Записываем результат в колонку "потерянные"
-            lost_col = result_sheet.max_column
-            result_sheet.cell(row=target_row, column=lost_col, value=lost_calls)
-            logger.info(f"✅ Сохранен результат: {mass_number} → {lost_calls}")
+            # Записываем результаты в найденные колонки
+            if lost_col is not None:
+                result_sheet.cell(row=target_row, column=lost_col, value=lost_calls)
+            if excess_col is not None:
+                result_sheet.cell(row=target_row, column=excess_col, value=excess_traffic)
+
+            logger.info(f"✅ Сохранен результат: {mass_number} → lost={lost_calls}, excess={excess_traffic}")
 
         # Сохраняем файл
         workbook.save(original_file_path)
@@ -277,12 +309,12 @@ def save_single_result_to_original_file(
 ) -> None:
     """
     Сохраняет результат одной строки в исходный Excel файл.
-    Добавляет колонки "Потерянные" и "Потерянные" если их нет.
+    Добавляет колонки "Потерянные" и "Превышение" если их нет.
 
     Args:
         mass_number: Номер массового инцидента
         lost_calls: Количество потерянных звонков
-        excess_traffic: Коэффициент превышения трафика (сохраняется как "Потерянные")
+        excess_traffic: Коэффициент превышения трафика (сохраняется как "Превышение")
         original_file_path: Путь к исходному Excel файлу
         row_index: Индекс строки в исходном файле
     """
@@ -293,16 +325,20 @@ def save_single_result_to_original_file(
         workbook = load_workbook(original_file_path)
         report_sheet = workbook["Отчет"]
 
-        # Проверяем есть ли колонки "Потерянные" и "Потерянные"
+        # Проверяем есть ли колонки "Потерянные" и "Превышение"
         lost_col = None
-        received_col = None
+        excess_col = None
 
         for col in range(1, report_sheet.max_column + 1):
             header = report_sheet.cell(row=1, column=col).value
-            if header and "Потерянные" in str(header).lower():
-                lost_col = col
-            elif header and "Потерянные" in str(header).lower():
-                received_col = col
+            if header:
+                header_str = str(header).strip()
+                if "потерянн" in header_str.lower():
+                    lost_col = col
+                    logger.info(f"🔍 Найдена существующая колонка 'Потерянные' в позиции {col}")
+                elif "превышен" in header_str.lower():
+                    excess_col = col
+                    logger.info(f"🔍 Найдена существующая колонка 'Превышение' в позиции {col}")
 
         # Если колонок нет, добавляем их
         if lost_col is None:
@@ -310,10 +346,10 @@ def save_single_result_to_original_file(
             report_sheet.cell(row=1, column=lost_col, value="Потерянные")
             logger.info(f"➕ Добавлена колонка 'Потерянные' в позицию {lost_col}")
 
-        if received_col is None:
-            received_col = report_sheet.max_column + 1
-            report_sheet.cell(row=1, column=received_col, value="Потерянные")
-            logger.info(f"➕ Добавлена колонка 'Потерянные' в позицию {received_col}")
+        if excess_col is None:
+            excess_col = report_sheet.max_column + 1
+            report_sheet.cell(row=1, column=excess_col, value="Превышение")
+            logger.info(f"➕ Добавлена колонка 'Превышение' в позицию {excess_col}")
 
         # Находим строку с нужным номером массовой
         mass_number_col = None
@@ -339,14 +375,14 @@ def save_single_result_to_original_file(
             logger.error(f"❌ Не найдена строка с номером массовой {mass_number}")
             return
 
-        # Записываем результаты
+        # Записываем результаты в существующие колонки
         report_sheet.cell(row=target_row, column=lost_col, value=lost_calls)
-        report_sheet.cell(row=target_row, column=received_col, value=excess_traffic)
+        report_sheet.cell(row=target_row, column=excess_col, value=excess_traffic)
 
         # Сохраняем файл
         try:
             workbook.save(original_file_path)
-            logger.info(f"✅ Результат сохранен в строку {target_row}: {mass_number} → lost={lost_calls}, received={excess_traffic}")
+            logger.info(f"✅ Результат сохранен в строку {target_row}: {mass_number} → lost={lost_calls} (колонка {lost_col}), excess={excess_traffic} (колонка {excess_col})")
         except PermissionError as pe:
             logger.error(f"❌ ОШИБКА ДОСТУПА: Файл {original_file_path} заблокирован")
             logger.error(f"   Возможные причины:")
