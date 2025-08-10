@@ -1,0 +1,364 @@
+timezone: Europe/Moscow
+interval_minutes: 15
+
+# Все доступные навыки из интерфейса Teleopti
+skills:
+  Problem Russia:
+    - "67"
+  Chelyabinsk_CC:
+    - "87"
+  Irkutsk_CC:
+    - "118"
+  СВУ_Челябинск:
+    - "129"
+  СВУ_Иркутск:
+    - "130"
+  СВУ_Ростов:
+    - "131"
+  СВУ_Саранск:
+    - "134"
+  Rostov_CC:
+    - "139"
+  Saransk_CC:
+    - "140"
+  Moscow:
+    - "156"
+  РВД_Иркутск:
+    - "215"
+  РВД_Ростов:
+    - "216"
+  РВД_Саранск:
+    - "217"
+  РВД_Челябинск:
+    - "218"
+  Skill_40:
+    - "241"
+  CityCall_611:
+    - "255"
+  Anti_churn:
+    - "663"
+  Black_MSK:
+    - "703"
+  Доп_часы_611:
+    - "282"
+  Помощь_611:
+    - "286"
+  Black_ros:
+    - "742"
+  Black_Irk:
+    - "743"
+  Black_che:
+    - "745"
+  Black_Sar:
+    - "747"
+  Skill_52:
+    - "754"
+  Рыбалка:
+    - "309"
+  Paid610+Rouming:
+    - "765"
+  MSK день:
+    - "808"
+  LowPriority_Sar:
+    - "346"
+  LowPriority_Ros:
+    - "347"
+  LowPriority_Che:
+    - "348"
+  LowPriority_Irk:
+    - "349"
+  MSK Ночь:
+    - "355"
+  HightPriorityRos:
+    - "362"
+  HightPriorityChe:
+    - "363"
+  HightPrioritySar:
+    - "364"
+  HightPriorityIrk:
+    - "365"
+  HightPriorityMsk:
+    - "366"
+  LowPriority_MSK:
+    - "839"
+  СВУ 611:
+    - "378"
+  РВД 611:
+    - "379"
+  Телефон 611:
+    - "380"  # исправлено по списку workload params
+  Voxys B2C:
+    - "883"
+  LowPrioritySPB:
+    - "895"
+  HightPrioritySPB:
+    - "897"
+  Консультант:
+    - "845"
+  Противодействие мошенничеству:
+    - "899"
+  Требуется InVoice:
+    - "902"
+  Претензия InVoice:
+    # — ID не найден, требуется уточнение
+  Stavropol' 611:
+    - "915"
+  ФЗ_303_ИЗО_B2C:
+    - "924"
+
+
+# Соответствие регионов из Excel к навыкам в Teleopti
+regions:
+  # Основные регионы (уже были)
+  Абакан:
+    - "308"  # Abakan
+  Архангельск:
+    - "381"  # Arhangel'sk
+  Барнаул:
+    - "309"  # Barnaul
+  Белгород:
+    - "376"  # Belgorod
+  Биробиджан:
+    - "310"  # Birobidzhan
+  Брянск:
+    - "377"  # Bryansk
+  Бурятия:
+    - "311"  # Buryatiya
+  Челябинск:
+    - "228"  # Chelyabinsk
+  Екатеринбург:
+    - "234"  # Ekaterinburg
+  Хабаровск:
+    - "714"  # Habarovsk
+  Воронеж:
+    - "375"  # Voroneg
+  Саранск:
+    - "429"  # Saransk
+  Саратов:
+    - "387"  # Saratov
+  Смоленск:
+    - "415"  # Smolensk
+  Санкт-Петербург:
+    - "374"  # SPB
+  Ставрополь:
+    - "915"  # Stavropol'
+  Тамбов:
+    - "388"  # Tambov
+  Томск:
+    - "317"  # Tomsk
+  Тула:
+    - "416"  # Tula
+  Тверь:
+    - "417"  # Tver'
+  Тюмень:
+    - "232"  # Tyumen
+  Ульяновск:
+    - "355"  # Ulyanovsk
+  Владимир:
+    - "419"  # Vladimir
+  Владивосток:
+    - "318"  # Vladivostok
+  Волгоград:
+    - "380"  # Volgograd
+  Вологда:
+    - "390"  # Vologda
+  Ярославль:
+    - "523"  # Yaroslavl
+
+  # Дополнительные регионы из логов
+  Ростов-на-Дону:
+    - "372"  # Rostov
+  Москва:
+    - "156"  # Moscow (исправлено по списку workload params)
+  Казань:
+    - "410"  # Kazan'
+  Кемерово:
+    - "435"  # Kemerovo
+  Ханты-Мансийск:
+    - "237"  # Khanty-Mansiysk
+  Киров:
+    - "551"  # Kirov_sar
+  Коми:
+    - "285"  # Komi
+  Кострома:
+    - "424"  # Kostroma
+  Краснодар:
+    - "370"  # Krasnodar
+  Красноярск:
+    - "305"  # Krasnoyarsk
+  Курган:
+    - "235"  # Kurgan
+  Курск:
+    - "378"  # Kursk
+  Липецк:
+    - "379"  # Lipetsk
+  Магадан:
+    - "314"  # Magadan
+  Мурманск:
+    - "383"  # Murmansk
+  Нижний Новгород:
+    - "413"  # NNovgorod
+  Норильск:
+    - "315"  # Noril'sk
+  Новосибирск:
+    - "306"  # Novosibirsk
+  Омск:
+    - "431"  # Omsk
+  Орел:
+    - "384"  # Orel
+  Оренбург:
+    - "233"  # Orenburg
+  Пенза:
+    - "584"  # Penza_sar
+  Пермь:
+    - "227"  # Perm
+  Петрозаводск:
+    - "385"  # Petrozavodsk
+  Псков:
+    - "386"  # Pskov
+  Рязань:
+    - "427"  # Ryazan'
+  Сахалин:
+    - "314"  # Sakhalin
+  Салехард:
+    - "236"  # Salekhard
+  Самара:
+    - "432"  # Samara
+  Йошкар-Ола:
+    - "554"  # Yoshkar-Ola_sar
+  Ижевск:
+    - "524"  # Igevsk
+  Иркутск:
+    - "303"  # Irkutsk
+  Иваново:
+    - "521"  # Ivanovo
+  Калининград:
+    - "382"  # Kaliningrad
+  Калуга:
+    - "422"  # Kaluga
+  Камчатка:
+    - "313"  # Kamchatka
+  Горно-Алтайск:
+    - "638"  # Gorno-Altaysk
+  Великий Новгород:
+    - "389"  # V.Novgorod
+
+  # Специальные регионы и навыки
+  Help_611:
+    - "747"  # Help_611
+  HightPriorityChe:
+    - "745"  # HightPriorityChe
+  HightPriorityIrk:
+    - "743"  # HightPriorityIrk
+  HightPriorityMsk:
+    - "703"  # HightPriorityMsk
+  HightPriorityRos:
+    - "742"  # HightPriorityRos
+  HightPrioritySar:
+    - "377"  # HightPrioritySar
+  HightPrioritySPB:
+    - "311"  # HightPrioritySPB
+  konsultant_irk:
+    - "553"  # konsultant_irk
+  konsultant_rostov:
+    - "228"  # konsultant_rostov
+  LowPriority_ИКЦ:
+    - "234"  # LowPriority_ИКЦ
+  LowPriority_РКЦ:
+    - "638"  # LowPriority_РКЦ
+  LowPriority_СКЦ:
+    - "714"  # LowPriority_СКЦ
+  LowPriority_ЧКЦ:
+    - "716"  # LowPriority_ЧКЦ
+  Paid610:
+    - "835"  # Paid610
+  problem_irk:
+    - "837"  # problem_irk
+  Rouming:
+    - "838"  # Rouming
+  Voxys_611:
+    - "833"  # Voxys 611
+  z_Abakan_irk:
+    - "836"  # z_Abakan_irk
+  z_Barnaul_irk:
+    - "897"  # z_Barnaul_irk
+  z_Belgorod:
+    - "524"  # z_Belgorod
+  z_Belgorod_Ros:
+    - "303"  # z_Belgorod_Ros
+  z_Cheboksary:
+    - "521"  # z_Cheboksary
+  z_Cheboksary_Che:
+    - "382"  # z_Cheboksary_Che
+  z_Chelyabinsk_Ural:
+    - "422"  # z_Chelyabinsk_Ural
+  z_Igevsk:
+    - "313"  # z_Igevsk
+  z_Kazan_sar:
+    - "410"  # z_Kazan'_sar
+  z_Khanty-Mansiysk_chel:
+    - "435"  # z_Khanty-Mansiysk_chel
+  z_Kirov:
+    - "237"  # z_Kirov
+  z_Kirov_NEW:
+    - "551"  # z_Kirov_NEW
+  z_Krasnoyarsk_povtor:
+    - "285"  # z_Krasnoyarsk_povtor
+  z_Moscow:
+    - "296"  # z_Moscow
+  z_Moscow_povtor:
+    - "898"  # z_Moscow_povtor
+  z_Moscow_povtor_New:
+    - "424"  # z_Moscow_povtor_New
+  z_NEW_DAY_Volgograd:
+    - "370"  # z_NEW_DAY_Volgograd
+  z_NEW_Volgograd:
+    - "305"  # z_NEW_Volgograd
+  z_NNovgorodNSS:
+    - "235"  # z_NNovgorodNSS
+  z_Penza:
+    - "378"  # z_Penza
+  z_Penza_sar:
+    - "379"  # z_Penza_sar
+  z_Perm_chel:
+    - "839"  # z_Perm_chel
+  z_Perm_povtor:
+    - "815"  # z_Perm_povtor
+  z_product_chel:
+    - "813"  # z_product_chel
+  z_product_irk:
+    - "811"  # z_product_irk
+  z_product_ros:
+    - "814"  # z_product_ros
+  z_product_sar:
+    - "895"  # z_product_sar
+  z_RTK:
+    - "314"  # z_RTK
+  z_RTK_Chel:
+    - "476"  # z_RTK_Chel
+  z_RTK_Sar:
+    - "808"  # z_RTK_Sar
+  z_Ryazan:
+    - "825"  # z_Ryazan'
+  z_Sakhalin_irk:
+    - "383"  # z_Sakhalin_irk
+  z_SPB_povtor:
+    - "413"  # z_SPB_povtor
+  z_Tomsk_rk:
+    - "315"  # z_Tomsk_rk
+  z_Tula_Sar:
+    - "306"  # z_Tula_Sar
+  z_Tula_sar:
+    - "431"  # z_Tula_sar
+  z_Tyumen_chel:
+    - "384"  # z_Tyumen_chel
+  z_Ulyanovsk_chel:
+    - "233"  # z_Ulyanovsk_chel
+  z_Volgograd:
+    - "433"  # z_Volgograd
+  z_Yoshkar-ola:
+    - "765"  # z_Yoshkar-ola
+  Картограф:
+    - "584"  # Картограф
+  Отказ от InVoice:
+    - "227"  # Отказ от InVoice

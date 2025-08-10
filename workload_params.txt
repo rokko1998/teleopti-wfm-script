@@ -1,0 +1,256 @@
+- "-1"  # Не определено
+- "393"  # 614 КСИМ
+- "409"  # 614 Москва КСИМ
+- "419"  # 614 Ставрополь
+- "124"  # 614_Russia
+- "337"  # 636_BO
+- "425"  # 636_BO_ФЗ303
+- "155"  # 636_Problem
+- "120"  # 636_Russia
+- "261"  # Alladin_TT
+- "256"  # Anti_churn
+- "123"  # AppS
+- "247"  # B2B_Admin_CCC
+- "237"  # B2B_Admin_EDO
+- "143"  # B2B_Admin_TT
+- "245"  # B2B_Admin_Voice
+- "146"  # B2B_ERF
+- "189"  # BackOffice_Admin_BPM
+- "191"  # BackOffice_Content
+- "190"  # BackOffice_COPS_BPM
+- "192"  # BackOffice_Tech_BPM
+- "303"  # Black_che
+- "302"  # Black_Irk
+- "279"  # Black_MSK
+- "300"  # Black_ros
+- "304"  # Black_Sar
+- "373"  # BO (AGENT)
+- "266"  # Chat_!Problem
+- "376"  # Chat_!Problem_New
+- "141"  # Chat_All
+- "150"  # Chat_B2B+MNP
+- "276"  # Chat_Chelybinsk
+- "358"  # Chat_Coord
+- "375"  # Chat_Coord_New
+- "277"  # Chat_Irkutsk
+- "264"  # Chat_Moscow
+- "275"  # Chat_Rostov
+- "193"  # Chat_russia
+- "371"  # Chat_russia_New
+- "289"  # Chat_Shpd
+- "377"  # Chat_Shpd_New
+- "341"  # Chat_Shpd_TS
+- "420"  # Chat_Stavropol
+- "311"  # Chat_Vip
+- "97"  # Cheliabinsk_Chat
+- "87"  # Chelyabinsk_CC
+- "65"  # Chelyabinsk_Problem
+- "255"  # CityCall_611
+- "278"  # Corpadmin_Chat
+- "122"  # Corpadmin_mail
+- "199"  # E-Shop_Out
+- "363"  # HightPriorityChe
+- "365"  # HightPriorityIrk
+- "366"  # HightPriorityMsk
+- "362"  # HightPriorityRos
+- "364"  # HightPrioritySar
+- "406"  # HightPrioritySPB
+- "207"  # Internet_Shop_New
+- "118"  # Irkutsk_CC
+- "96"  # Irkutsk_Chat
+- "35"  # Irkutsk_China
+- "348"  # LowPriority_Che
+- "349"  # LowPriority_Irk
+- "367"  # LowPriority_MSK
+- "347"  # LowPriority_Ros
+- "346"  # LowPriority_Sar
+- "405"  # LowPrioritySPB
+- "246"  # Mail-канал
+- "310"  # MNP
+- "390"  # MNP Active
+- "389"  # MNP Cancel
+- "391"  # MNP mnp
+- "392"  # MNP Potential
+- "357"  # Monitoring_Analytics
+- "356"  # Monitoring_Оценка
+- "156"  # Moscow
+- "344"  # MSK день
+- "355"  # MSK Ночь
+- "267"  # MVNO
+- "306"  # NewProduct_Chelyabinsk
+- "305"  # NewProduct_Irkutsk
+- "307"  # NewProduct_Rostov
+- "308"  # NewProduct_Saransk
+- "314"  # Paid610
+- "315"  # Paid610+Rouming
+- "67"  # Problem Russia
+- "153"  # Problem Russia old
+- "139"  # Rostov_CC
+- "83"  # Rostov_CDMA+LTE+TS-Russia
+- "95"  # Rostov_Chat
+- "64"  # Rostov_Problem
+- "244"  # RTK_611
+- "140"  # Saransk_CC
+- "72"  # Saransk_Chat
+- "66"  # Saransk_Problem
+- "238"  # SIM replacement
+- "241"  # Skill_40
+- "309"  # Skill_52 Рыбалка
+- "343"  # Skylink
+- "293"  # Social_Network_new
+- "242"  # Social_Webim
+- "417"  # Stavropol' 611
+- "342"  # Test_import
+- "127"  # TM_MNP_Chel
+- "281"  # TM_MNP_Ros
+- "280"  # TM_MNP_Sar
+- "126"  # TM_NPS
+- "125"  # TM_Sale
+- "110"  # TM_Shadow
+- "350"  # TS_ШПД_Тест
+- "336"  # VIP
+- "396"  # Voxys B2C
+- "221"  # Whatsapp
+- "171"  # z_BackOffice_Admin
+- "177"  # z_BackOffice_Admin_In
+- "172"  # z_BackOffice_Content
+- "178"  # z_BackOffice_Content_In
+- "173"  # z_BackOffice_DataTransfer
+- "179"  # z_BackOffice_DataTransfer_In
+- "174"  # z_BackOffice_LostPayments
+- "180"  # z_BackOffice_LostPayments_In
+- "181"  # z_BackOffice_MNP_In
+- "274"  # z_BackOffice_MNP_In для E-mail2
+- "175"  # z_BackOffice_Tech
+- "176"  # z_BackOffice_Tech_In
+- "63"  # z_Cheliabinsk_mail
+- "103"  # z_Content_call
+- "104"  # z_Content_new
+- "105"  # z_Content_work
+- "111"  # z_Data transfer
+- "71"  # z_Irkutsk_mail
+- "106"  # z_LostPayments_call
+- "107"  # z_LostPayments_new
+- "108"  # z_LostPayments_work
+- "271"  # z_NewProduct_Chelyabinsk_D&G
+- "268"  # z_NewProduct_Irkutsk_D&G
+- "272"  # z_NewProduct_Moscow_D&G
+- "269"  # z_NewProduct_Rostov_D&G
+- "270"  # z_NewProduct_Saransk_D&G
+- "61"  # z_Rostov_mail
+- "128"  # z_Russia_mail
+- "68"  # z_Saransk_mail
+- "243"  # z_Social_Chat
+- "195"  # z_Social_Network
+- "109"  # z_TCS
+- "102"  # z_Tech_call
+- "100"  # z_Tech_new
+- "101"  # z_Tech_work
+- "208"  # z_test_wfm
+- "265"  # z_ШПД_TS
+- "416"  # zzz_ОбучРезерв
+- "415"  # zzz_Посттренерская
+- "287"  # Волонтёр
+- "368"  # Доп часы 614
+- "384"  # Доп часы 636
+- "383"  # Доп.часы TS
+- "413"  # Доп.часы Webim
+- "283"  # Доп.часы Онлайн
+- "402"  # Доп.часы ТS чат
+- "386"  # Доп.часы ШПД Координация
+- "385"  # Доп.часы ШПД Продажи
+- "388"  # Доп.часы ШПД Продажи Исходящая
+- "282"  # Доп_часы_611
+- "407"  # Консультант
+- "394"  # КСИМ 614
+- "428"  # отложенные обращение (тест)
+- "395"  # Помощь TS
+- "399"  # Помощь в чатах
+- "374"  # Помощь в экспертах КК
+- "372"  # Помощь на чаты b2b/mnp
+- "286"  # Помощь_611
+- "414"  # Претензия InVoice
+- "408"  # Противодействие мошенничеству
+- "403"  # Работа в выходной день
+- "332"  # Работа в выходной день ТТ
+- "299"  # Работа с избытком
+- "421"  # Работа с угрозами
+- "379"  # РВД 611
+- "382"  # РВД 636
+- "412"  # РВД Webim
+- "400"  # РВД помощь в чатах
+- "313"  # РВД чаты 636
+- "296"  # РВД Чаты B2B/MNP
+- "212"  # РВД_614
+- "318"  # РВД_MNP
+- "214"  # РВД_ГНКО
+- "215"  # РВД_Иркутск
+- "220"  # РВД_Онлайн
+- "216"  # РВД_Ростов
+- "217"  # РВД_Саранск
+- "254"  # РВД_Соц.сеть
+- "218"  # РВД_Челябинск
+- "418"  # РегистрацияSIMСтаврополь
+- "225"  # РО_Иркутск
+- "222"  # РО_Ростов
+- "223"  # РО_Саранск
+- "224"  # РО_Челябинск
+- "117"  # Ростов КЦ
+- "240"  # Сovid
+- "273"  # Саморегистрация Skill_61
+- "404"  # Сверхурочное время
+- "378"  # СВУ 611
+- "381"  # СВУ 636
+- "411"  # СВУ Webim
+- "401"  # СВУ помощь в чатах
+- "312"  # СВУ чаты 636
+- "294"  # СВУ Чаты B2B/MNP
+- "138"  # СВУ_614
+- "317"  # СВУ_MNP
+- "142"  # СВУ_ГНКО
+- "130"  # СВУ_Иркутск
+- "219"  # СВУ_Онлайн
+- "133"  # СВУ_РМА
+- "131"  # СВУ_Ростов
+- "132"  # СВУ_РСА
+- "134"  # СВУ_Саранск
+- "136"  # СВУ_СМА
+- "253"  # СВУ_Соц.сеть
+- "135"  # СВУ_ССА
+- "129"  # СВУ_Челябинск
+- "24"  # сервис 608
+- "380"  # Телефон 611
+- "232"  # Телефон мониторинг
+- "410"  # Требуется InVoice
+- "226"  # УР_614
+- "227"  # УР_636
+- "228"  # УР_ГНКО
+- "230"  # УР_Интернет магазин
+- "231"  # УР_Интернет магазин БС
+- "229"  # УР_Онлайн
+- "424"  # ФЗ_303_ИЗО_B2C
+- "326"  # ШПД Работа в выходной день Координация
+- "320"  # ШПД Работа в выходной день Продажи
+- "322"  # ШПД Работа в выходной день Продажи Исход
+- "359"  # ШПД РВД Чаты
+- "325"  # ШПД Сверхурочное время Координация
+- "319"  # ШПД Сверхурочное время Продажи
+- "321"  # ШПД Сверхурочное время Продажи Исход
+- "360"  # ШПД СВУ чаты
+- "338"  # ШПД_Заявки_Ожидание
+- "259"  # ШПД_Координация
+- "422"  # ШПД_Линия Саморегистрации (61)
+- "292"  # ШПД_Монтаж
+- "290"  # ШПД_новые
+- "423"  # ШПД_Ночное время
+- "288"  # ШПД_Общие вопросы
+- "291"  # ШПД_ожидание
+- "351"  # ШПД_Перевод от робота
+- "258"  # ШПД_Продажи
+- "339"  # ШПД_Розница_продажи
+- "361"  # ШПД_ротации_коорд
+- "340"  # ШПД_СЗ
+- "353"  # ШПД_ТС
+- "330"  # ШПД_ТТ
+- "333"  # ШПД_ТТ_новые_автоматизированная
+- "334"  # ШПД_ТТ_новые_неавтоматизированная

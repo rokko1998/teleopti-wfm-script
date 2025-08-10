@@ -1,0 +1,402 @@
+- "-1"  # Не определено
+- "302"  # 1
+- "354"  # 1
+- "359"  # 1
+- "360"  # 1
+- "361"  # 1
+- "363"  # 1
+- "866"  # 1
+- "774"  # 1
+- "775"  # 1
+- "780"  # 1
+- "863"  # 1
+- "864"  # 1
+- "865"  # 1
+- "766"  # 1
+- "767"  # 1
+- "768"  # 1
+- "769"  # 1
+- "770"  # 1
+- "771"  # 1
+- "658"  # 1
+- "659"  # 1
+- "732"  # 1
+- "735"  # 1
+- "760"  # 1
+- "762"  # 1
+- "603"  # 1
+- "605"  # 1
+- "606"  # 1
+- "607"  # 1
+- "609"  # 1
+- "610"  # 1
+- "583"  # 1
+- "595"  # 1
+- "597"  # 1
+- "599"  # 1
+- "600"  # 1
+- "602"  # 1
+- "575"  # 1
+- "576"  # 1
+- "577"  # 1
+- "579"  # 1
+- "580"  # 1
+- "581"  # 1
+- "364"  # 1
+- "366"  # 1
+- "367"  # 1
+- "369"  # 1
+- "438"  # 1
+- "572"  # 1
+- "323"  # 2
+- "336"  # 3
+- "642"  # 608
+- "647"  # 608 B2B Admin
+- "651"  # 608 Corpzapros
+- "696"  # 608 Corpzapros
+- "689"  # 61 Тест
+- "879"  # 614 КСИМ
+- "917"  # 614 Ставрополь
+- "793"  # 636 BO
+- "322"  # 636_ALL
+- "357"  # 636_Business
+- "747"  # 711_Black_Sar
+- "88"  # 888_China
+- "308"  # Abakan
+- "876"  # Active
+- "491"  # Admin
+- "506"  # Admin
+- "529"  # Admin
+- "671"  # Alladin
+- "663"  # Anti_churn
+- "381"  # Arhangel'sk
+- "441"  # b2b_admin
+- "444"  # b2b_admin
+- "617"  # B2B_EDO
+- "309"  # Barnaul
+- "376"  # Belgorod
+- "310"  # Birobidzhan
+- "745"  # Black_che
+- "743"  # Black_Irk
+- "703"  # Black_MSK
+- "742"  # Black_ros
+- "377"  # Bryansk
+- "311"  # Buryatiya
+- "874"  # Cancel
+- "652"  # CCC
+- "861"  # Chat_!Problem_New
+- "450"  # chat_614
+- "332"  # Chat_636
+- "436"  # chat_all
+- "254"  # Chat_Chel
+- "694"  # Chat_Chelybinsk
+- "827"  # Chat_Coord
+- "859"  # Chat_Coord_New
+- "253"  # Chat_irk
+- "695"  # Chat_Irkutsk
+- "758"  # chat_mnp
+- "677"  # Chat_Moscow
+- "333"  # Chat_PM_Support
+- "680"  # chat_problem
+- "252"  # Chat_Rostov
+- "693"  # Chat_Rostov
+- "534"  # chat_russia
+- "842"  # chat_russia_New
+- "195"  # Chat_Sar
+- "725"  # chat_shpd
+- "862"  # Chat_Shpd_New
+- "799"  # chat_shpd_ts
+- "553"  # Cheboksary_sar
+- "158"  # cheliabinsk_email
+- "228"  # Chelyabinsk
+- "339"  # Chelyabinsk_614
+- "662"  # Citycall_636
+- "492"  # Content
+- "507"  # Content
+- "273"  # Content
+- "274"  # Content
+- "275"  # Content
+- "531"  # COPS
+- "698"  # Corpadmin_Chat
+- "629"  # Covid19
+- "288"  # data_transfer
+- "494"  # DataTransfer
+- "509"  # DataTransfer
+- "532"  # DataTransfer
+- "639"  # Dealer portal
+- "331"  # EDO_mail
+- "234"  # Ekaterinburg
+- "562"  # E-Shop
+- "564"  # E-Shop LTE-450
+- "217"  # GNKO_TS
+- "638"  # Gorno-Altaysk
+- "330"  # GOZ_Pochta
+- "714"  # Habarovsk
+- "716"  # Help_611
+- "835"  # HightPriorityChe
+- "837"  # HightPriorityIrk
+- "838"  # HightPriorityMsk
+- "833"  # HightPriorityRos
+- "836"  # HightPrioritySar
+- "897"  # HightPrioritySPB
+- "524"  # Igevsk
+- "303"  # Irkutsk
+- "337"  # Irkutsk_614
+- "183"  # Irkutsk_email
+- "521"  # Ivanovo
+- "382"  # Kaliningrad
+- "422"  # Kaluga
+- "313"  # Kamchatka
+- "410"  # Kazan'
+- "435"  # Kemerovo
+- "237"  # Khanty-Mansiysk
+- "551"  # Kirov_sar
+- "285"  # Komi
+- "392"  # konsultant_che
+- "296"  # konsultant_irk
+- "297"  # konsultant_ros
+- "898"  # konsultant_rostov
+- "299"  # konsultant_sar
+- "424"  # Kostroma
+- "370"  # Krasnodar
+- "305"  # Krasnoyarsk
+- "235"  # Kurgan
+- "378"  # Kursk
+- "379"  # Lipetsk
+- "495"  # LostPayments
+- "510"  # LostPayments
+- "277"  # LostPayments_call
+- "279"  # LostPayments_new
+- "281"  # LostPayments_work
+- "839"  # LowPriority_MSK
+- "815"  # LowPriority_ИКЦ
+- "813"  # LowPriority_РКЦ
+- "811"  # LowPriority_СКЦ
+- "814"  # LowPriority_ЧКЦ
+- "895"  # LowPrioritySPB
+- "314"  # Magadan
+- "439"  # mail_all
+- "511"  # MNP
+- "756"  # MNP
+- "877"  # Mnp
+- "691"  # MNP для E-mail2
+- "826"  # Monitoring_Analytics
+- "824"  # Monitoring_Оценка
+- "476"  # Msk
+- "808"  # MSK день
+- "825"  # MSK Ночь
+- "383"  # Murmansk
+- "684"  # NewPorduct_Chel
+- "685"  # NewPorduct_Irk
+- "686"  # NewPorduct_Mos
+- "687"  # NewPorduct_Ros
+- "688"  # NewPorduct_Sar
+- "750"  # NewProduct_Chelyabinsk
+- "748"  # NewProduct_Irkutsk
+- "752"  # NewProduct_Rostov
+- "751"  # NewProduct_Sar
+- "413"  # NNovgorod
+- "315"  # Noril'sk
+- "306"  # Novosibirsk
+- "700"  # OCC/GTS
+- "431"  # Omsk
+- "384"  # Orel
+- "233"  # Orenburg
+- "545"  # Outgoing
+- "763"  # Paid610
+- "433"  # Paid610
+- "765"  # Paid610+Rouming
+- "584"  # Penza_sar
+- "227"  # Perm
+- "385"  # Petrozavodsk
+- "878"  # Potential
+- "460"  # Problem_636
+- "165"  # Problem_Che
+- "167"  # problem_irk
+- "163"  # Problem_ros
+- "166"  # problem_sar
+- "451"  # Problems
+- "386"  # Pskov
+- "628"  # Psychotype
+- "372"  # Rostov
+- "340"  # Rostov_614
+- "145"  # Rostov_mail
+- "434"  # Rouming
+- "646"  # rtk_611
+- "740"  # RTK_614
+- "427"  # Ryazan'
+- "316"  # Sakhalin
+- "236"  # Salekhard
+- "432"  # Samara
+- "429"  # Saransk
+- "341"  # Saransk_614
+- "168"  # Saransk_mail
+- "387"  # Saratov
+- "286"  # Shadow
+- "727"  # shpd_new
+- "784"  # shpd_nonauto
+- "782"  # shpd_tt_auto
+- "728"  # shpd_wait
+- "618"  # SIM repl
+- "634"  # Skil_40
+- "661"  # skill 301
+- "717"  # skill_107
+- "754"  # Skill_52
+- "841"  # skill_800(замена сим)
+- "637"  # Skylink
+- "806"  # Skylink
+- "643"  # sm_chat
+- "537"  # sm_mlg
+- "731"  # sm_mlg
+- "415"  # Smolensk
+- "374"  # SPB
+- "918"  # Stavropol
+- "915"  # Stavropol'
+- "539"  # T2ST
+- "388"  # Tambov
+- "683"  # TBE
+- "283"  # tcs_ros
+- "496"  # Tech
+- "504"  # Tech
+- "533"  # Tech
+- "272"  # Tech_call
+- "266"  # Tech_new
+- "270"  # Tech_work
+- "565"  # test_wfm
+- "802"  # test1
+- "803"  # test2
+- "804"  # test3
+- "820"  # test4
+- "347"  # TM_MNP
+- "705"  # TM_MNP_Ros
+- "704"  # TM_MNP_sar
+- "346"  # TM_NPS
+- "344"  # TM_Sale
+- "317"  # Tomsk
+- "679"  # TS
+- "416"  # Tula
+- "417"  # Tver'
+- "232"  # Tyumen
+- "355"  # Ulyanovsk
+- "389"  # V.Novgorod
+- "649"  # VAS-услуги (49)
+- "650"  # VAS-услуги (55)
+- "791"  # VIP
+- "419"  # Vladimir
+- "318"  # Vladivostok
+- "380"  # Volgograd
+- "390"  # Vologda
+- "375"  # Voroneg
+- "475"  # Voxed B2B
+- "883"  # Voxys 611
+- "635"  # Webim
+- "591"  # whatsapp
+- "619"  # Yandex
+- "523"  # Yaroslavl
+- "554"  # Yoshkar-Ola_sar
+- "550"  # z_Abakan_irk
+- "549"  # z_Barnaul_irk
+- "681"  # z_Belgorod
+- "645"  # z_Belgorod_Ros
+- "420"  # z_Cheboksary
+- "548"  # z_Cheboksary_Che
+- "231"  # z_Chelyabinsk_Ural
+- "356"  # z_Igevsk
+- "500"  # z_Igevsk
+- "546"  # z_Kazan'_sar
+- "640"  # z_Khanty-Mansiysk_chel
+- "446"  # z_Kirov
+- "499"  # z_Kirov_NEW
+- "456"  # z_Krasnoyarsk_povtor
+- "412"  # z_Moscow
+- "454"  # z_Moscow_povtor
+- "630"  # z_Moscow_povtor_New
+- "404"  # z_NEW_DAY_Volgograd
+- "351"  # z_NEW_Volgograd
+- "414"  # z_NNovgorodNSS
+- "448"  # z_Penza
+- "636"  # z_Penza_sar
+- "660"  # z_Perm_chel
+- "453"  # z_Perm_povtor
+- "620"  # z_product_chel
+- "624"  # z_product_irk
+- "622"  # z_product_ros
+- "623"  # z_product_sar
+- "473"  # z_RTK
+- "561"  # z_RTK_Chel
+- "590"  # z_RTK_Sar
+- "569"  # z_Ryazan'
+- "593"  # z_Sakhalin_irk
+- "455"  # z_SPB_povtor
+- "588"  # z_Tomsk_rk
+- "632"  # z_Tula_Sar
+- "657"  # z_Tula_sar
+- "644"  # z_Tyumen_chel
+- "631"  # z_Ulyanovsk_chel
+- "440"  # z_Volgograd
+- "430"  # z_Yoshkar-ola
+- "848"  # Байкал и Дальний Восток
+- "847"  # Волга
+- "800"  # Для_Своих
+- "840"  # Доп часы 614
+- "870"  # Доп часы 636
+- "869"  # Доп.часы TS
+- "907"  # Доп.часы Webim
+- "708"  # Доп.часы Онлайн
+- "890"  # Доп.часы ТS
+- "872"  # Доп.часы ШПД Координация
+- "871"  # Доп.часы ШПД Продажи
+- "873"  # Доп.часы ШПД Продажи Исход
+- "706"  # Доп_часы_611
+- "712"  # Картограф
+- "845"  # Консультант
+- "669"  # координация
+- "880"  # КСИМ 614
+- "920"  # Линия Саморегистрации
+- "729"  # монтаж
+- "857"  # Москва
+- "901"  # Москва КСИМ 614
+- "912"  # ОбучРезерв
+- "724"  # общие вопросы
+- "909"  # Отказ от InVoice
+- "931"  # отложен
+- "881"  # Помощь TS
+- "887"  # Помощь в чатах
+- "858"  # Помощь в экспертах КК
+- "844"  # Помощь на чаты b2b/mnp
+- "911"  # Посттрен
+- "666"  # продажи
+- "899"  # Противодействие мошенничеству
+- "894"  # Работа в выходной день
+- "741"  # Работа с избытком
+- "919"  # Работа с угрозами
+- "868"  # РВД 636
+- "906"  # РВД Webim
+- "888"  # РВД помощь в чатах
+- "916"  # РегистрацияSIMСтаврополь
+- "796"  # Розница_продажи
+- "892"  # Сверхурочное время
+- "867"  # СВУ 636
+- "904"  # СВУ Webim
+- "889"  # СВУ помощь в чатах
+- "855"  # Северо-Запад
+- "73"  # сервис 608
+- "853"  # Сибирь
+- "503"  # СотрудникB2B_711_Lin
+- "902"  # Требуется Invoice
+- "822"  # ТС
+- "854"  # Урал
+- "924"  # ФЗ_303_ИЗО_B2C
+- "926"  # ФЗ303
+- "850"  # Центр
+- "851"  # Черноземье
+- "817"  # ШПД
+- "829"  # ШПД РВД чаты
+- "831"  # ШПД СВУ чаты
+- "794"  # ШПД_Заявки_Ожидание
+- "922"  # ШПД_Ночное время
+- "818"  # ШПД_Перевод от робота
+- "832"  # шпд_ротации_коорд
+- "797"  # ШПД_СЗ
+- "779"  # ШПД_ТТ
+- "852"  # Юг
