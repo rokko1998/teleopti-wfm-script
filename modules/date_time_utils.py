@@ -38,9 +38,16 @@ def round_to_15_minutes_up(dt: datetime) -> datetime:
 
 def windows_for_row(row) -> List[Tuple[datetime, datetime]]:
     """Разбиваем период массового инцидента на дневные окна с учетом точного времени."""
+    import pandas as pd
+    
     result = []
     start: datetime = row["Старт"]
     end: datetime = row["Окончание"]
+
+    # Проверяем на NaT значения
+    if pd.isna(start) or pd.isna(end):
+        logger.warning(f"⚠️ Обнаружены NaT значения в датах: Старт={start}, Окончание={end}")
+        return result
 
     # Если инцидент в рамках одного дня
     if start.date() == end.date():

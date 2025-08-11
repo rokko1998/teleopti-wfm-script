@@ -331,7 +331,7 @@ def check_notes_column(
 
         # Получаем значение из колонки "Заметки"
         notes_value = report_sheet.cell(row=target_row, column=notes_col).value
-        
+
         if notes_value is None:
             logger.info(f"📝 Строка {target_row}: колонка 'Заметки' пустая - обрабатываем")
             return False, notes_value, "notes_empty"
@@ -480,7 +480,7 @@ def save_single_result_to_original_file(
         # Проверяем, есть ли уже значения в колонках "Потерянные" и "Превышение"
         existing_lost = report_sheet.cell(row=target_row, column=lost_col).value
         existing_excess = report_sheet.cell(row=target_row, column=excess_col).value
-        
+
         if existing_lost is not None and existing_excess is not None:
             # Проверяем, что значения не пустые и не равны 0 (если это не специальный случай)
             if str(existing_lost).strip() != "" and str(existing_excess).strip() != "":
