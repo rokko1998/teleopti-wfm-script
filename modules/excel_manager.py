@@ -300,6 +300,62 @@ def save_results_to_excel(
         logger.error(f"❌ Ошибка при сохранении результатов: {e}")
 
 
+def check_notes_column(
+    workbook,
+    report_sheet,
+    target_row: int
+) -> tuple:
+    """
+    Проверяет значение в колонке "Заметки" для определения необходимости обработки.
+
+    Args:
+        workbook: Рабочая книга Excel
+        report_sheet: Лист для проверки
+        target_row: Номер строки для проверки
+
+    Returns:
+        tuple: (should_skip, notes_value, reason) - нужно ли пропускать строку
+    """
+    try:
+        # Ищем колонку "Заметки"
+        notes_col = None
+        for col in range(1, report_sheet.max_column + 1):
+            header = report_sheet.cell(row=1, column=col).value
+            if header and "заметк" in str(header).lower():
+                notes_col = col
+                break
+
+        if notes_col is None:
+            logger.warning("⚠️ Колонка 'Заметки' не найдена - обрабатываем все строки")
+            return False, None, "notes_column_not_found"
+
+        # Получаем значение из колонки "Заметки"
+        notes_value = report_sheet.cell(row=target_row, column=notes_col).value
+        
+        if notes_value is None:
+            logger.info(f"📝 Строка {target_row}: колонка 'Заметки' пустая - обрабатываем")
+            return False, notes_value, "notes_empty"
+
+        # Пытаемся преобразовать в число для сравнения
+        try:
+            notes_numeric = float(str(notes_value).strip())
+            if notes_numeric < 50:
+                logger.info(f"📝 Строка {target_row}: заметка = {notes_value} < 50 - пропускаем вычисления")
+                return True, notes_value, "notes_less_50"
+            else:
+                logger.info(f"📝 Строка {target_row}: заметка = {notes_value} >= 50 - обрабатываем")
+                return False, notes_value, "notes_ok"
+        except (ValueError, TypeError):
+            # Если не удалось преобразовать в число, считаем что это текстовая заметка
+            logger.info(f"📝 Строка {target_row}: заметка = '{notes_value}' (текст) - обрабатываем")
+            return False, notes_value, "notes_text"
+
+    except Exception as e:
+        logger.error(f"❌ Ошибка при проверке колонки 'Заметки': {e}")
+        # В случае ошибки обрабатываем строку
+        return False, None, "error_checking_notes"
+
+
 def save_excel_batch(
     workbook,
     report_sheet,
@@ -359,7 +415,7 @@ def save_single_result_to_original_file(
         save_counter: Счетчик записей для пакетного сохранения
 
     Returns:
-        tuple: (workbook, report_sheet, save_counter) для возможного повторного использования
+        tuple: (workbook, report_sheet, save_counter, skip_reason) для возможного повторного использования
     """
     logger.info(f"💾 Сохраняем результат для {mass_number}: lost={lost_calls}, excess={excess_traffic}")
 
@@ -407,7 +463,7 @@ def save_single_result_to_original_file(
 
         if mass_number_col is None:
             logger.error("❌ Не найдена колонка с номером массовой")
-            return workbook, report_sheet, save_counter
+            return workbook, report_sheet, save_counter, "no_mass_number_col"
 
         # Ищем строку с нужным номером массовой
         target_row = None
@@ -419,7 +475,17 @@ def save_single_result_to_original_file(
 
         if target_row is None:
             logger.error(f"❌ Не найдена строка с номером массовой {mass_number}")
-            return workbook, report_sheet, save_counter
+            return workbook, report_sheet, save_counter, "row_not_found"
+
+        # Проверяем, есть ли уже значения в колонках "Потерянные" и "Превышение"
+        existing_lost = report_sheet.cell(row=target_row, column=lost_col).value
+        existing_excess = report_sheet.cell(row=target_row, column=excess_col).value
+        
+        if existing_lost is not None and existing_excess is not None:
+            # Проверяем, что значения не пустые и не равны 0 (если это не специальный случай)
+            if str(existing_lost).strip() != "" and str(existing_excess).strip() != "":
+                logger.info(f"⏭️ Строка {mass_number} уже обработана (lost={existing_lost}, excess={existing_excess}) - пропускаем")
+                return workbook, report_sheet, save_counter, "already_processed"
 
         # Записываем результаты в существующие колонки
         report_sheet.cell(row=target_row, column=lost_col, value=lost_calls)
@@ -430,7 +496,7 @@ def save_single_result_to_original_file(
 
         logger.info(f"✅ Результат записан в строку {target_row}: {mass_number} → lost={lost_calls} (колонка {lost_col}), excess={excess_traffic} (колонка {excess_col})")
 
-        return workbook, report_sheet, save_counter
+        return workbook, report_sheet, save_counter, "success"
 
     except Exception as e:
         logger.error(f"❌ Ошибка при записи результата для {mass_number}: {e}")

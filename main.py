@@ -189,6 +189,55 @@ def main():
                     logger.warning(f"⚠️ Регион '{region}' не найден в конфигурации, пропускаем")
                     continue
 
+                # Проверяем колонку "Заметки" для определения необходимости обработки
+                from modules.excel_manager import check_notes_column
+                should_skip_notes, notes_value, notes_reason = check_notes_column(workbook, report_sheet, idx + 2)  # +2 так как Excel строки начинаются с 1, а заголовок на строке 1
+                
+                if should_skip_notes:
+                    logger.info(f"📝 Пропускаем вычисления для {mass_number} (заметка = {notes_value} < 50)")
+                    # Записываем нули в колонки "Потерянные" и "Превышение"
+                    try:
+                        workbook, report_sheet, save_counter, skip_reason = save_single_result_to_original_file(
+                            mass_number=mass_number,
+                            lost_calls=0,
+                            excess_traffic=0.0,
+                            original_file_path=input_xlsx_path,
+                            row_index=idx,
+                            workbook=workbook,
+                            report_sheet=report_sheet,
+                            save_counter=save_counter
+                        )
+                        
+                        if skip_reason == "already_processed":
+                            logger.info(f"⏭️ Строка {mass_number} уже обработана - пропускаем")
+                            continue
+                        elif skip_reason == "success":
+                            logger.info(f"✅ Нули записаны для {mass_number} (заметка < 50)")
+                            
+                            # Проверяем нужно ли сохранить пакет
+                            if save_counter >= batch_size:
+                                logger.info(f"📦 Сохраняем пакет из {save_counter} записей...")
+                                from modules.excel_manager import save_excel_batch
+                                if save_excel_batch(workbook, report_sheet, input_xlsx_path):
+                                    save_counter = 0  # Сбрасываем счетчик
+                                    logger.info(f"✅ Пакет успешно сохранен! Прогресс: {processed_rows}/{total_rows} ({progress_percent:.1f}%)")
+                        else:
+                            logger.warning(f"⚠️ Неожиданный результат сохранения: {skip_reason}")
+                            
+                    except Exception as save_exc:
+                        logger.error(f"❌ ОШИБКА СОХРАНЕНИЯ для {mass_number}: {save_exc}")
+                        continue
+                    
+                    # Создаем запись результата с нулями
+                    result = create_result_record(
+                        mass_number,
+                        row.get('Старт', 'unknown').strftime('%Y-%m-%d') if hasattr(row.get('Старт', ''), 'strftime') else 'unknown',
+                        0,  # lost_calls = 0
+                        0.0  # excess_traffic = 0.0
+                    )
+                    results.append(result)
+                    continue
+
                 workload_params = cfg["regions"][region]
 
                 # Разбиваем на дневные окна
@@ -210,7 +259,7 @@ def main():
 
                         # Сохраняем результат в уже открытый Excel файл
                         try:
-                            workbook, report_sheet, save_counter = save_single_result_to_original_file(
+                            workbook, report_sheet, save_counter, skip_reason = save_single_result_to_original_file(
                                 mass_number=mass_number,
                                 lost_calls=lost,
                                 excess_traffic=excess,
@@ -220,15 +269,22 @@ def main():
                                 report_sheet=report_sheet,
                                 save_counter=save_counter
                             )
-                            logger.info(f"✅ Результат записан в файл: {mass_number} → lost={lost}, excess={excess}")
+                            
+                            if skip_reason == "already_processed":
+                                logger.info(f"⏭️ Строка {mass_number} уже обработана - пропускаем")
+                                break  # Выходим из цикла окон для этой строки
+                            elif skip_reason == "success":
+                                logger.info(f"✅ Результат записан в файл: {mass_number} → lost={lost}, excess={excess}")
 
-                            # Проверяем нужно ли сохранить пакет
-                            if save_counter >= batch_size:
-                                logger.info(f"📦 Сохраняем пакет из {save_counter} записей...")
-                                from modules.excel_manager import save_excel_batch
-                                if save_excel_batch(workbook, report_sheet, input_xlsx_path):
-                                    save_counter = 0  # Сбрасываем счетчик
-                                    logger.info(f"✅ Пакет успешно сохранен! Прогресс: {processed_rows}/{total_rows} ({progress_percent:.1f}%)")
+                                # Проверяем нужно ли сохранить пакет
+                                if save_counter >= batch_size:
+                                    logger.info(f"📦 Сохраняем пакет из {save_counter} записей...")
+                                    from modules.excel_manager import save_excel_batch
+                                    if save_excel_batch(workbook, report_sheet, input_xlsx_path):
+                                        save_counter = 0  # Сбрасываем счетчик
+                                        logger.info(f"✅ Пакет успешно сохранен! Прогресс: {processed_rows}/{total_rows} ({progress_percent:.1f}%)")
+                            else:
+                                logger.warning(f"⚠️ Неожиданный результат сохранения: {skip_reason}")
 
                         except Exception as save_exc:
                             logger.error(f"❌ ОШИБКА СОХРАНЕНИЯ для {mass_number}: {save_exc}")
@@ -281,7 +337,7 @@ def main():
             # Обрабатываем каждую строку
             for idx, row in df.iterrows():
                 region = row["Регион"]
-                
+
                 # Показываем прогресс
                 processed_rows += 1
                 progress_percent = (processed_rows / total_rows) * 100
@@ -353,7 +409,7 @@ def main():
                         continue
 
             logger.info(f"🎉 Обработка завершена! Обработано {len(results)} проблем")
-            
+
             # Сохраняем в CSV файл (стандартный режим)
             save_results_to_csv(results, out_csv_path)
 
