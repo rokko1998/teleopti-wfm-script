@@ -205,13 +205,13 @@ def main():
                             report_sheet=report_sheet,
                             save_counter=save_counter
                         )
-                        
+
                         if skip_reason == "already_processed":
                             logger.info(f"⏭️ Строка {mass_number} уже обработана - пропускаем")
                             continue
                         elif skip_reason == "success":
                             logger.info(f"✅ Нули записаны для {mass_number} (NaT в дате начала)")
-                            
+
                             # Проверяем нужно ли сохранить пакет
                             if save_counter >= batch_size:
                                 logger.info(f"📦 Сохраняем пакет из {save_counter} записей...")
@@ -221,11 +221,11 @@ def main():
                                     logger.info(f"✅ Пакет успешно сохранен! Прогресс: {processed_rows}/{total_rows} ({progress_percent:.1f}%)")
                         else:
                             logger.warning(f"⚠️ Неожиданный результат сохранения: {skip_reason}")
-                            
+
                     except Exception as save_exc:
                         logger.error(f"❌ ОШИБКА СОХРАНЕНИЯ для {mass_number}: {save_exc}")
                         continue
-                    
+
                     # Создаем запись результата с нулями
                     result = create_result_record(
                         mass_number,
