@@ -41,7 +41,7 @@ def windows_for_row(row) -> List[Tuple[datetime, datetime]]:
     """Разбиваем период массового инцидента на дневные окна с учетом точного времени."""
     import pandas as pd
     from datetime import date, datetime, timedelta
-
+    
     result = []
     start: datetime = row["Старт"]
     end: datetime = row["Окончание"]
@@ -50,7 +50,7 @@ def windows_for_row(row) -> List[Tuple[datetime, datetime]]:
     if pd.isna(start):
         logger.warning(f"⚠️ Обнаружено NaT значение в дате начала - пропускаем строку")
         return result
-
+    
     if pd.isna(end):
         # Если Окончание = NaT, значит проблема открыта - используем текущую дату
         logger.info(f"📅 Проблема открыта (Окончание = NaT), используем текущую дату")
@@ -58,9 +58,13 @@ def windows_for_row(row) -> List[Tuple[datetime, datetime]]:
         # Округляем до конца дня
         end = end.replace(hour=23, minute=59, second=59, microsecond=0)
 
+    # ОТЛАДКА: Показываем исходные даты
+    logger.info(f"🔍 Исходные даты для {row.get('Номер массовой', 'N/A')}: Старт={start}, Окончание={end}")
+
     # Если инцидент в рамках одного дня
     if start.date() == end.date():
         result.append((start, end))
+        logger.info(f"📅 Однодневное окно: {start} - {end}")
         return result
 
     current_date = start.date()
@@ -71,19 +75,23 @@ def windows_for_row(row) -> List[Tuple[datetime, datetime]]:
             window_start = start
             window_end = datetime.combine(current_date, dtime(23, 59, 59))
             result.append((window_start, window_end))
+            logger.info(f"📅 Первый день: {window_start} - {window_end}")
         elif current_date == end.date():
             # Последний день: с 00:00:00 до точного времени окончания
             window_start = datetime.combine(current_date, dtime(0, 0, 0))
             window_end = end
             result.append((window_start, window_end))
+            logger.info(f"📅 Последний день: {window_start} - {window_end}")
         else:
             # Полные дни: с 00:00:00 до 23:59:59
             window_start = datetime.combine(current_date, dtime(0, 0, 0))
             window_end = datetime.combine(current_date, dtime(23, 59, 59))
             result.append((window_start, window_end))
+            logger.info(f"📅 Полный день: {window_start} - {window_end}")
 
         current_date += timedelta(days=1)
 
+    logger.info(f"📊 Всего создано временных окон: {len(result)}")
     return result
 
 

@@ -297,16 +297,27 @@ def main():
 
                 for window_idx, (win_start, win_end) in enumerate(time_windows):
                     logger.info(f"🔸 Обрабатываем окно #{window_idx + 1}/{len(time_windows)}")
+                    
+                    # ОТЛАДКА: Показываем детали временного окна
+                    logger.info(f"🔍 Временное окно #{window_idx + 1}: {win_start} - {win_end}")
+                    logger.info(f"🔍 Типы данных: win_start={type(win_start)}, win_end={type(win_end)}")
 
                     # Преобразуем в datetime без изменения часового пояса
                     win_start = prepare_datetime_for_report(win_start)
                     win_end = prepare_datetime_for_report(win_end)
+                    
+                    # ОТЛАДКА: Показываем преобразованные даты
+                    logger.info(f"🔍 Преобразованные даты: {win_start} - {win_end}")
 
                     try:
                         logger.info(f"🚀 Запускаем download_report для {mass_number} {win_start.date()}")
+                        logger.info(f"🔍 Передаем в download_report: start={win_start}, end={win_end}")
                         xlsx_path = download_report(driver, workload_params, win_start, win_end)
                         logger.info(f"📊 Обрабатываем метрики из файла: {xlsx_path}")
                         lost, excess = calc_metrics(xlsx_path)
+                        
+                        # ОТЛАДКА: Показываем результаты расчета
+                        logger.info(f"🔍 Результаты расчета: lost={lost}, excess={excess}")
 
                         # Сохраняем результат в уже открытый Excel файл
                         try:
