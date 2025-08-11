@@ -300,6 +300,40 @@ def save_results_to_excel(
         logger.error(f"❌ Ошибка при сохранении результатов: {e}")
 
 
+def save_excel_batch(
+    workbook,
+    report_sheet,
+    original_file_path: Path,
+    batch_size: int = 10
+) -> bool:
+    """
+    Сохраняет Excel файл пакетно.
+
+    Args:
+        workbook: Рабочая книга Excel
+        report_sheet: Лист для сохранения
+        original_file_path: Путь к файлу для сохранения
+        batch_size: Размер пакета для сохранения
+
+    Returns:
+        bool: True если сохранение успешно
+    """
+    try:
+        workbook.save(original_file_path)
+        logger.info(f"💾 Пакет сохранен в файл: {original_file_path.name}")
+        return True
+    except PermissionError as pe:
+        logger.error(f"❌ ОШИБКА ДОСТУПА: Файл {original_file_path} заблокирован")
+        logger.error(f"   Возможные причины:")
+        logger.error(f"   - Файл открыт в Excel")
+        logger.error(f"   - Файл открыт в другой программе")
+        logger.error(f"   - Недостаточно прав доступа")
+        raise pe
+    except Exception as save_e:
+        logger.error(f"❌ Ошибка при сохранении файла: {save_e}")
+        raise save_e
+
+
 def save_single_result_to_original_file(
     mass_number: str,
     lost_calls: int,
@@ -307,7 +341,8 @@ def save_single_result_to_original_file(
     original_file_path: Path,
     row_index: int,
     workbook=None,
-    report_sheet=None
+    report_sheet=None,
+    save_counter=0
 ) -> tuple:
     """
     Сохраняет результат одной строки в исходный Excel файл.
@@ -321,9 +356,10 @@ def save_single_result_to_original_file(
         row_index: Индекс строки в исходном файле
         workbook: Опционально - уже открытая рабочая книга (для пакетного сохранения)
         report_sheet: Опционально - уже открытый лист (для пакетного сохранения)
+        save_counter: Счетчик записей для пакетного сохранения
 
     Returns:
-        tuple: (workbook, report_sheet) для возможного повторного использования
+        tuple: (workbook, report_sheet, save_counter) для возможного повторного использования
     """
     logger.info(f"💾 Сохраняем результат для {mass_number}: lost={lost_calls}, excess={excess_traffic}")
 
@@ -371,7 +407,7 @@ def save_single_result_to_original_file(
 
         if mass_number_col is None:
             logger.error("❌ Не найдена колонка с номером массовой")
-            return workbook, report_sheet
+            return workbook, report_sheet, save_counter
 
         # Ищем строку с нужным номером массовой
         target_row = None
@@ -383,15 +419,18 @@ def save_single_result_to_original_file(
 
         if target_row is None:
             logger.error(f"❌ Не найдена строка с номером массовой {mass_number}")
-            return workbook, report_sheet
+            return workbook, report_sheet, save_counter
 
         # Записываем результаты в существующие колонки
         report_sheet.cell(row=target_row, column=lost_col, value=lost_calls)
         report_sheet.cell(row=target_row, column=excess_col, value=excess_traffic)
 
+        # Увеличиваем счетчик записей
+        save_counter += 1
+
         logger.info(f"✅ Результат записан в строку {target_row}: {mass_number} → lost={lost_calls} (колонка {lost_col}), excess={excess_traffic} (колонка {excess_col})")
 
-        return workbook, report_sheet
+        return workbook, report_sheet, save_counter
 
     except Exception as e:
         logger.error(f"❌ Ошибка при записи результата для {mass_number}: {e}")

@@ -160,16 +160,29 @@ def main():
             try:
                 workbook = load_workbook(input_xlsx_path)
                 report_sheet = workbook["Отчет"]
-                logger.info("✅ Excel файл открыт для пакетного сохранения")
+                logger.info("✅ Excel файл открыт для пакетного сохранения (каждые 10 записей)")
             except Exception as e:
                 logger.error(f"❌ Не удалось открыть Excel файл: {e}")
                 return
+
+            # Инициализируем счетчики для прогресса
+            total_rows = len(df_to_process)
+            processed_rows = 0
+            save_counter = 0
+            batch_size = 10
+
+            logger.info(f"🚀 Начинаем обработку {total_rows} строк...")
+            logger.info(f"📦 Пакетное сохранение каждые {batch_size} записей")
 
             # Обрабатываем каждую строку из выбранного DataFrame
             for idx, row in df_to_process.iterrows():
                 region = row["Регион"]
                 mass_number = row["Номер массовой"]
-                logger.info(f"🔄 Обрабатываем строку #{idx}: {mass_number} - {region}")
+                
+                # Показываем прогресс
+                processed_rows += 1
+                progress_percent = (processed_rows / total_rows) * 100
+                logger.info(f"🔄 [{processed_rows}/{total_rows}] ({progress_percent:.1f}%) Обрабатываем: {mass_number} - {region}")
 
                 # Проверяем есть ли регион в конфигурации
                 if not validate_region_in_config(region, cfg):
@@ -197,16 +210,26 @@ def main():
 
                         # Сохраняем результат в уже открытый Excel файл
                         try:
-                            workbook, report_sheet = save_single_result_to_original_file(
+                            workbook, report_sheet, save_counter = save_single_result_to_original_file(
                                 mass_number=mass_number,
                                 lost_calls=lost,
                                 excess_traffic=excess,
                                 original_file_path=input_xlsx_path,
                                 row_index=idx,
                                 workbook=workbook,
-                                report_sheet=report_sheet
+                                report_sheet=report_sheet,
+                                save_counter=save_counter
                             )
                             logger.info(f"✅ Результат записан в файл: {mass_number} → lost={lost}, excess={excess}")
+
+                            # Проверяем нужно ли сохранить пакет
+                            if save_counter >= batch_size:
+                                logger.info(f"📦 Сохраняем пакет из {save_counter} записей...")
+                                from modules.excel_manager import save_excel_batch
+                                if save_excel_batch(workbook, report_sheet, input_xlsx_path):
+                                    save_counter = 0  # Сбрасываем счетчик
+                                    logger.info(f"✅ Пакет успешно сохранен! Прогресс: {processed_rows}/{total_rows} ({progress_percent:.1f}%)")
+
                         except Exception as save_exc:
                             logger.error(f"❌ ОШИБКА СОХРАНЕНИЯ для {mass_number}: {save_exc}")
                             logger.error(f"   Продолжаем выполнение без сохранения в файл")
@@ -232,26 +255,37 @@ def main():
                         logger.exception("   Полный traceback:")
                         continue
 
-            # Сохраняем Excel файл один раз в конце
-            try:
-                workbook.save(input_xlsx_path)
-                logger.info(f"💾 Все результаты сохранены в исходный файл: {input_xlsx_path}")
-            except PermissionError as pe:
-                logger.error(f"❌ ОШИБКА ДОСТУПА при сохранении: {input_xlsx_path} открыт в Excel или заблокирован")
-                logger.error(f"   Закройте файл в Excel и попробуйте снова")
-            except Exception as save_e:
-                logger.error(f"❌ Ошибка при сохранении файла: {save_e}")
+            # Сохраняем оставшиеся записи, если они есть
+            if save_counter > 0:
+                logger.info(f"📦 Сохраняем финальный пакет из {save_counter} записей...")
+                try:
+                    from modules.excel_manager import save_excel_batch
+                    if save_excel_batch(workbook, report_sheet, input_xlsx_path):
+                        logger.info(f"✅ Финальный пакет успешно сохранен!")
+                except Exception as final_save_e:
+                    logger.error(f"❌ Ошибка при сохранении финального пакета: {final_save_e}")
 
             logger.info(f"🎉 Обработка завершена! Обработано {len(results)} проблем")
+            logger.info(f"💾 Все результаты сохранены в исходный файл: {input_xlsx_path}")
 
         else:
             # Стандартный режим: обработка всех проблем
             logger.info("📋 Используется стандартный режим обработки всех проблем")
 
+            # Инициализируем счетчики для прогресса
+            total_rows = len(df)
+            processed_rows = 0
+
+            logger.info(f"🚀 Начинаем обработку {total_rows} строк...")
+
             # Обрабатываем каждую строку
             for idx, row in df.iterrows():
                 region = row["Регион"]
-                logger.info(f"🔄 Обрабатываем строку #{idx}: {row['Номер массовой']} - {region}")
+                
+                # Показываем прогресс
+                processed_rows += 1
+                progress_percent = (processed_rows / total_rows) * 100
+                logger.info(f"🔄 [{processed_rows}/{total_rows}] ({progress_percent:.1f}%) Обрабатываем: {row['Номер массовой']} - {region}")
 
                 # Проверяем есть ли регион в конфигурации
                 if not validate_region_in_config(region, cfg):
@@ -318,6 +352,8 @@ def main():
                         logger.exception("   Полный traceback:")
                         continue
 
+            logger.info(f"🎉 Обработка завершена! Обработано {len(results)} проблем")
+            
             # Сохраняем в CSV файл (стандартный режим)
             save_results_to_csv(results, out_csv_path)
 
