@@ -155,6 +155,16 @@ def main():
 
             logger.info(f"📊 Найдено {len(df_to_process)} проблем для даты {target_date.strftime('%d.%m.%Y')}")
 
+            # Открываем Excel файл один раз для пакетного сохранения
+            from openpyxl import load_workbook
+            try:
+                workbook = load_workbook(input_xlsx_path)
+                report_sheet = workbook["Отчет"]
+                logger.info("✅ Excel файл открыт для пакетного сохранения")
+            except Exception as e:
+                logger.error(f"❌ Не удалось открыть Excel файл: {e}")
+                return
+
             # Обрабатываем каждую строку из выбранного DataFrame
             for idx, row in df_to_process.iterrows():
                 region = row["Регион"]
@@ -168,77 +178,71 @@ def main():
 
                 workload_params = cfg["regions"][region]
 
-                # ОТЛАДКА: Показываем исходные времена из Excel
-                logger.info(f"📅 Исходные данные из Excel:")
-                logger.info(f"   Старт: {row['Старт']} (тип: {type(row['Старт'])})")
-                logger.info(f"   Окончание: {row['Окончание']} (тип: {type(row['Окончание'])})")
+                # Разбиваем на дневные окна
+                time_windows = list(windows_for_row(row))
+                logger.info(f"📊 Создано временных окон: {len(time_windows)}")
 
-                # Получаем временное окно для указанной даты
-                win_start, win_end = calculate_time_window_for_date(row, target_date)
+                for window_idx, (win_start, win_end) in enumerate(time_windows):
+                    logger.info(f"🔸 Обрабатываем окно #{window_idx + 1}/{len(time_windows)}")
 
-                logger.info(f"🕒 Временное окно (исходное):")
-                logger.info(f"   win_start: {win_start} (тип: {type(win_start)})")
-                logger.info(f"   win_end: {win_end} (тип: {type(win_end)})")
+                    # Преобразуем в datetime без изменения часового пояса
+                    win_start = prepare_datetime_for_report(win_start)
+                    win_end = prepare_datetime_for_report(win_end)
 
-                # Преобразуем в datetime без изменения часового пояса
-                # Время уже в МСК как в Excel файле - НЕ МЕНЯЕМ часовой пояс!
-                win_start = prepare_datetime_for_report(win_start)
-                win_end = prepare_datetime_for_report(win_end)
-
-                logger.info(f"🕒 Временное окно (финальное МСК):")
-                logger.info(f"   win_start: {win_start}")
-                logger.info(f"   win_end: {win_end}")
-
-                try:
-                    logger.info(f"🚀 Запускаем download_report для {mass_number} {win_start.date()}")
-                    xlsx_path = download_report(driver, workload_params, win_start, win_end)
-                    logger.info(f"📊 Обрабатываем метрики из файла: {xlsx_path}")
-                    lost, excess = calc_metrics(xlsx_path)
-
-                    # Сохраняем результат сразу в исходный файл
                     try:
-                        save_single_result_to_original_file(
-                            mass_number=mass_number,
-                            lost_calls=lost,
-                            excess_traffic=excess,
-                            original_file_path=input_xlsx_path,
-                            row_index=idx
+                        logger.info(f"🚀 Запускаем download_report для {mass_number} {win_start.date()}")
+                        xlsx_path = download_report(driver, workload_params, win_start, win_end)
+                        logger.info(f"📊 Обрабатываем метрики из файла: {xlsx_path}")
+                        lost, excess = calc_metrics(xlsx_path)
+
+                        # Сохраняем результат в уже открытый Excel файл
+                        try:
+                            workbook, report_sheet = save_single_result_to_original_file(
+                                mass_number=mass_number,
+                                lost_calls=lost,
+                                excess_traffic=excess,
+                                original_file_path=input_xlsx_path,
+                                row_index=idx,
+                                workbook=workbook,
+                                report_sheet=report_sheet
+                            )
+                            logger.info(f"✅ Результат записан в файл: {mass_number} → lost={lost}, excess={excess}")
+                        except Exception as save_exc:
+                            logger.error(f"❌ ОШИБКА СОХРАНЕНИЯ для {mass_number}: {save_exc}")
+                            logger.error(f"   Продолжаем выполнение без сохранения в файл")
+                            continue
+
+                        # Создаем запись результата для возможного сохранения в CSV
+                        result = create_result_record(
+                            mass_number,
+                            win_start.date().isoformat(),
+                            lost,
+                            excess
                         )
-                        logger.info(f"✅ Результат сохранен в файл: {mass_number} → lost={lost}, excess={excess}")
-                    except PermissionError as pe:
-                        logger.error(f"❌ ОШИБКА ДОСТУПА: Файл {input_xlsx_path} открыт в Excel или заблокирован")
-                        logger.error(f"   Закройте файл в Excel и попробуйте снова")
-                        logger.error(f"   Детали: {pe}")
-                        # Продолжаем выполнение, но не добавляем в results
-                        continue
-                    except Exception as save_exc:
-                        logger.error(f"❌ ОШИБКА СОХРАНЕНИЯ для {mass_number}: {save_exc}")
-                        logger.error(f"   Продолжаем выполнение без сохранения в файл")
-                        # Продолжаем выполнение, но не добавляем в results
+                        results.append(result)
+
+                        logger.info(f"✅ Успешно обработан {mass_number} - {region}: lost={lost}, excess={excess}")
+                    except Exception as exc:
+                        logger.error(f"❌ ОШИБКА для строки #{idx} MassID {mass_number} {region}")
+                        try:
+                            logger.error(f"   Период: {win_start.date()} - {win_end.date()}")
+                        except:
+                            logger.error(f"   Период: не удалось определить")
+                        logger.error(f"   Детали ошибки: {exc}")
+                        logger.exception("   Полный traceback:")
                         continue
 
-                    # Создаем запись результата для возможного сохранения в CSV
-                    result = create_result_record(
-                        mass_number,
-                        win_start.date().isoformat(),
-                        lost,
-                        excess
-                    )
-                    results.append(result)
-
-                    logger.info(f"✅ Успешно обработан {mass_number} - {region}: lost={lost}, excess={excess}")
-                except Exception as exc:
-                    logger.error(f"❌ ОШИБКА для строки #{idx} MassID {mass_number} {region}")
-                    try:
-                        logger.error(f"   Период: {win_start.date()} - {win_end.date()}")
-                    except:
-                        logger.error(f"   Период: не удалось определить")
-                    logger.error(f"   Детали ошибки: {exc}")
-                    logger.exception("   Полный traceback:")
-                    continue
+            # Сохраняем Excel файл один раз в конце
+            try:
+                workbook.save(input_xlsx_path)
+                logger.info(f"💾 Все результаты сохранены в исходный файл: {input_xlsx_path}")
+            except PermissionError as pe:
+                logger.error(f"❌ ОШИБКА ДОСТУПА при сохранении: {input_xlsx_path} открыт в Excel или заблокирован")
+                logger.error(f"   Закройте файл в Excel и попробуйте снова")
+            except Exception as save_e:
+                logger.error(f"❌ Ошибка при сохранении файла: {save_e}")
 
             logger.info(f"🎉 Обработка завершена! Обработано {len(results)} проблем")
-            logger.info(f"💾 Результаты сохранены в исходный файл: {input_xlsx_path}")
 
         else:
             # Стандартный режим: обработка всех проблем
@@ -261,17 +265,10 @@ def main():
 
                 for window_idx, (win_start, win_end) in enumerate(time_windows):
                     logger.info(f"🔸 Обрабатываем окно #{window_idx + 1}/{len(time_windows)}")
-                    logger.info(f"🕒 Временное окно (исходное):")
-                    logger.info(f"   win_start: {win_start} (тип: {type(win_start)})")
-                    logger.info(f"   win_end: {win_end} (тип: {type(win_end)})")
 
                     # Преобразуем в datetime без изменения часового пояса
                     win_start = prepare_datetime_for_report(win_start)
                     win_end = prepare_datetime_for_report(win_end)
-
-                    logger.info(f"🕒 Временное окно (финальное МСК):")
-                    logger.info(f"   win_start: {win_start}")
-                    logger.info(f"   win_end: {win_end}")
 
                     try:
                         logger.info(f"🚀 Запускаем download_report для {row['Номер массовой']} {win_start.date()}")
@@ -279,7 +276,29 @@ def main():
                         logger.info(f"📊 Обрабатываем метрики из файла: {xlsx_path}")
                         lost, excess = calc_metrics(xlsx_path)
 
-                        # Создаем запись результата
+                        # Сохраняем результат сразу в исходный файл
+                        try:
+                            save_single_result_to_original_file(
+                                mass_number=row["Номер массовой"],
+                                lost_calls=lost,
+                                excess_traffic=excess,
+                                original_file_path=input_xlsx_path,
+                                row_index=idx
+                            )
+                            logger.info(f"✅ Результат сохранен в файл: {row['Номер массовой']} → lost={lost}, excess={excess}")
+                        except PermissionError as pe:
+                            logger.error(f"❌ ОШИБКА ДОСТУПА: Файл {input_xlsx_path} открыт в Excel или заблокирован")
+                            logger.error(f"   Закройте файл в Excel и попробуйте снова")
+                            logger.error(f"   Детали: {pe}")
+                            # Продолжаем выполнение, но не добавляем в results
+                            continue
+                        except Exception as save_exc:
+                            logger.error(f"❌ ОШИБКА СОХРАНЕНИЯ для {row['Номер массовой']}: {save_exc}")
+                            logger.error(f"   Продолжаем выполнение без сохранения в файл")
+                            # Продолжаем выполнение, но не добавляем в results
+                            continue
+
+                        # Создаем запись результата для возможного сохранения в CSV
                         result = create_result_record(
                             row["Номер массовой"],
                             win_start.date().isoformat(),

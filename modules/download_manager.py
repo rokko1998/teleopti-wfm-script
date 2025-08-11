@@ -36,33 +36,32 @@ def setup_date_range(driver, start_dt: datetime, end_dt: datetime):
     """
     date_fmt = "%d.%m.%Y"
 
-    # Дата от (с увеличенными паузами)
+    # Дата от (оптимизированные паузы)
     logger.info(f"📅 Устанавливаем дату от: {start_dt.strftime(date_fmt)}")
     date_from = find_parameter_input(driver, "Дата от")
-    time.sleep(2)  # Увеличили паузу
+    time.sleep(1)  # Уменьшили с 2 до 1
     date_from.click()
-    time.sleep(2)  # Увеличили паузу
+    time.sleep(1)  # Уменьшили с 2 до 1
     date_from.send_keys(Keys.CONTROL, "a")
-    time.sleep(2)  # Увеличили паузу
+    time.sleep(0.5)  # Уменьшили с 2 до 0.5
     date_from.send_keys(start_dt.strftime(date_fmt))
-    time.sleep(2)  # Увеличили паузу
+    time.sleep(1)  # Уменьшили с 2 до 1
     date_from.send_keys(Keys.TAB)  # подтвердить дату
-    time.sleep(3)  # Увеличили паузу для применения изменений
-    logger.info(f"✅ Дата от установлена: {start_dt.strftime(date_fmt)}")
+    time.sleep(2)  # Уменьшили с 3 до 2 для применения изменений
 
-    # Дата до (с увеличенными паузами)
+    # Дата до (оптимизированные паузы)
     logger.info(f"📅 Устанавливаем дату до: {end_dt.strftime(date_fmt)}")
     date_to = find_parameter_input(driver, "Дата до")
-    time.sleep(2)  # Увеличили паузу
+    time.sleep(1)  # Уменьшили с 2 до 1
     date_to.click()
-    time.sleep(2)  # Увеличили паузу
+    time.sleep(1)  # Уменьшили с 2 до 1
     date_to.send_keys(Keys.CONTROL, "a")  # Очистить поле
-    time.sleep(2)  # Увеличили паузу
+    time.sleep(0.5)  # Уменьшили с 2 до 0.5
     date_to.send_keys(end_dt.strftime(date_fmt))
-    time.sleep(2)  # Увеличили паузу
+    time.sleep(1)  # Уменьшили с 2 до 1
     date_to.send_keys(Keys.TAB)  # подтвердить дату
-    time.sleep(3)  # Увеличили паузу для применения изменений
-    logger.info(f"✅ Дата до установлена: {end_dt.strftime(date_fmt)}")
+    time.sleep(2)  # Уменьшили с 3 до 2 для применения изменений
+    logger.info(f"✅ Диапазон дат установлен: {start_dt.strftime(date_fmt)} - {end_dt.strftime(date_fmt)}")
 
 
 def setup_time_intervals(driver, start_dt: datetime, end_dt: datetime):
@@ -78,13 +77,9 @@ def setup_time_intervals(driver, start_dt: datetime, end_dt: datetime):
         # Получаем отформатированные временные интервалы
         start_time_str, end_time_str = format_time_intervals(start_dt, end_dt)
 
-        logger.info(f"🕒 Исходное время: {start_dt.strftime('%H:%M')} - {end_dt.strftime('%H:%M')}")
-        logger.info(f"⏰ Округленное время (15-мин интервалы): {start_time_str} - {end_time_str}")
-        logger.info(f"   📍 Начало округлено ВНИЗ: {start_dt.strftime('%H:%M')} → {start_time_str}")
-        logger.info(f"   📍 Конец округлен ВВЕРХ: {end_dt.strftime('%H:%M')} → {end_time_str}")
+        logger.info(f"⏰ Настраиваем временные интервалы: {start_time_str} - {end_time_str}")
 
         # Интервал от
-        logger.info("Выбираем интервал ОТ...")
         interval_from_element = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((
                 By.XPATH,
@@ -94,10 +89,6 @@ def setup_time_intervals(driver, start_dt: datetime, end_dt: datetime):
 
         interval_from_select = Select(interval_from_element)
 
-        # Получаем все доступные опции для отладки
-        available_options = [option.text.strip() for option in interval_from_select.options if option.text.strip()]
-        logger.info(f"Доступные варианты времени ОТ: {available_options[:10]}")
-
         # Пробуем разные форматы времени (убираем ведущие нули для Windows)
         time_formats_to_try = get_time_format_variations(start_time_str)
 
@@ -105,7 +96,6 @@ def setup_time_intervals(driver, start_dt: datetime, end_dt: datetime):
         for time_format in time_formats_to_try:
             try:
                 interval_from_select.select_by_visible_text(time_format)
-                logger.info(f"✅ Выбран интервал ОТ: {time_format}")
                 selected = True
                 break
             except:
@@ -115,14 +105,10 @@ def setup_time_intervals(driver, start_dt: datetime, end_dt: datetime):
             logger.warning(f"Не удалось выбрать время {start_time_str}, выбираем первый доступный")
             try:
                 interval_from_select.select_by_index(0)
-                logger.info(f"✅ Выбрана первая опция: {interval_from_select.first_selected_option.text}")
             except Exception as e:
                 logger.error(f"Ошибка выбора времени ОТ: {e}")
 
-        time.sleep(1)
-
         # Интервал до
-        logger.info("Выбираем интервал ДО...")
         interval_to_element = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((
                 By.XPATH,
@@ -132,10 +118,6 @@ def setup_time_intervals(driver, start_dt: datetime, end_dt: datetime):
 
         interval_to_select = Select(interval_to_element)
 
-        # Получаем все доступные опции для отладки
-        available_options_to = [option.text.strip() for option in interval_to_select.options if option.text.strip()]
-        logger.info(f"Доступные варианты времени ДО: {available_options_to[:10]}")
-
         # Пробуем разные форматы времени (убираем ведущие нули для Windows)
         time_formats_to_try_end = get_time_format_variations(end_time_str)
 
@@ -143,7 +125,6 @@ def setup_time_intervals(driver, start_dt: datetime, end_dt: datetime):
         for time_format in time_formats_to_try_end:
             try:
                 interval_to_select.select_by_visible_text(time_format)
-                logger.info(f"✅ Выбран интервал ДО: {time_format}")
                 selected_end = True
                 break
             except:
@@ -154,7 +135,6 @@ def setup_time_intervals(driver, start_dt: datetime, end_dt: datetime):
             try:
                 # Выбираем последний элемент (максимальное время)
                 interval_to_select.select_by_index(len(interval_to_select.options) - 1)
-                logger.info(f"✅ Выбрана последняя опция: {interval_to_select.first_selected_option.text}")
             except Exception as e:
                 logger.error(f"Ошибка выбора времени ДО: {e}")
 
@@ -164,9 +144,7 @@ def setup_time_intervals(driver, start_dt: datetime, end_dt: datetime):
         try:
             current_from = interval_from_select.first_selected_option.text.strip()
             current_to = interval_to_select.first_selected_option.text.strip()
-            logger.info(f"✅ ВРЕМЯ УСПЕШНО НАСТРОЕНО:")
-            logger.info(f"   📍 Интервал ОТ: {current_from}")
-            logger.info(f"   📍 Интервал ДО: {current_to}")
+            logger.info(f"✅ Временные интервалы настроены: {current_from} - {current_to}")
         except:
             logger.warning("⚠️ Не удалось проверить выбранное время")
 
@@ -249,10 +227,10 @@ def download_report(
     apply_cdp_download_settings(driver)
 
     # Переходим в правильный фрейм, если он используется
-    logger.info("⏳ Ждем загрузки страницы отчета (до 30с)...")
+    logger.info("⏳ Ждем загрузки страницы отчета...")
     switch_to_report_frame(driver, timeout=30)
 
-    time.sleep(1)  # Небольшая пауза для стабильности
+    time.sleep(0.5)  # Уменьшили с 1 до 0.5
 
     # --- 1) даты / время -------------------------------------------------------
     setup_date_range(driver, start_dt, end_dt)
@@ -266,7 +244,7 @@ def download_report(
         raise Exception("Не удалось настроить регионы")
 
     logger.info("✅ Рабочая нагрузка настроена успешно")
-    time.sleep(1)  # Пауза перед генерацией отчета
+    time.sleep(0.5)  # Уменьшили с 1 до 0.5
 
     # --- 4) Excel --------------------------------------------------------------
     logger.info("📊 Все параметры настроены, генерируем отчет...")

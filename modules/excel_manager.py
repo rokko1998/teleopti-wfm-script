@@ -305,8 +305,10 @@ def save_single_result_to_original_file(
     lost_calls: int,
     excess_traffic: float,
     original_file_path: Path,
-    row_index: int
-) -> None:
+    row_index: int,
+    workbook=None,
+    report_sheet=None
+) -> tuple:
     """
     Сохраняет результат одной строки в исходный Excel файл.
     Добавляет колонки "Потерянные" и "Превышение" если их нет.
@@ -317,13 +319,21 @@ def save_single_result_to_original_file(
         excess_traffic: Коэффициент превышения трафика (сохраняется как "Превышение")
         original_file_path: Путь к исходному Excel файлу
         row_index: Индекс строки в исходном файле
+        workbook: Опционально - уже открытая рабочая книга (для пакетного сохранения)
+        report_sheet: Опционально - уже открытый лист (для пакетного сохранения)
+
+    Returns:
+        tuple: (workbook, report_sheet) для возможного повторного использования
     """
     logger.info(f"💾 Сохраняем результат для {mass_number}: lost={lost_calls}, excess={excess_traffic}")
 
     try:
-        # Загружаем рабочую книгу
-        workbook = load_workbook(original_file_path)
-        report_sheet = workbook["Отчет"]
+        # Загружаем рабочую книгу, если не передана
+        if workbook is None:
+            workbook = load_workbook(original_file_path)
+            report_sheet = workbook["Отчет"]
+        elif report_sheet is None:
+            report_sheet = workbook["Отчет"]
 
         # Проверяем есть ли колонки "Потерянные" и "Превышение"
         lost_col = None
@@ -361,7 +371,7 @@ def save_single_result_to_original_file(
 
         if mass_number_col is None:
             logger.error("❌ Не найдена колонка с номером массовой")
-            return
+            return workbook, report_sheet
 
         # Ищем строку с нужным номером массовой
         target_row = None
@@ -373,27 +383,16 @@ def save_single_result_to_original_file(
 
         if target_row is None:
             logger.error(f"❌ Не найдена строка с номером массовой {mass_number}")
-            return
+            return workbook, report_sheet
 
         # Записываем результаты в существующие колонки
         report_sheet.cell(row=target_row, column=lost_col, value=lost_calls)
         report_sheet.cell(row=target_row, column=excess_col, value=excess_traffic)
 
-        # Сохраняем файл
-        try:
-            workbook.save(original_file_path)
-            logger.info(f"✅ Результат сохранен в строку {target_row}: {mass_number} → lost={lost_calls} (колонка {lost_col}), excess={excess_traffic} (колонка {excess_col})")
-        except PermissionError as pe:
-            logger.error(f"❌ ОШИБКА ДОСТУПА: Файл {original_file_path} заблокирован")
-            logger.error(f"   Возможные причины:")
-            logger.error(f"   - Файл открыт в Excel")
-            logger.error(f"   - Файл открыт в другой программе")
-            logger.error(f"   - Недостаточно прав доступа")
-            raise pe
-        except Exception as save_e:
-            logger.error(f"❌ Ошибка при сохранении файла: {save_e}")
-            raise save_e
+        logger.info(f"✅ Результат записан в строку {target_row}: {mass_number} → lost={lost_calls} (колонка {lost_col}), excess={excess_traffic} (колонка {excess_col})")
+
+        return workbook, report_sheet
 
     except Exception as e:
-        logger.error(f"❌ Ошибка при сохранении результата для {mass_number}: {e}")
+        logger.error(f"❌ Ошибка при записи результата для {mass_number}: {e}")
         raise
