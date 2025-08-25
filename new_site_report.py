@@ -5,14 +5,14 @@ python new_site_report.py — Основной скрипт для выгруз�
 """
 
 import sys
-import argparse
-import logging
 import time
-from datetime import datetime, timedelta
+import argparse
 from pathlib import Path
+from datetime import datetime
+from loguru import logger
 
-# Импортируем наши модули
-from modules.selenium_helpers import get_driver, apply_cdp_download_settings, setup_proxy
+# Импорты из наших модулей
+from modules.selenium_helpers import get_driver, setup_proxy, apply_cdp_download_settings
 from modules.new_site_handler import NewSiteHandler
 
 
@@ -25,22 +25,35 @@ NEW_SITE_URL = (
 DEFAULT_DOWNLOAD_DIR = str(Path.home() / "Downloads")
 
 
-def setup_logging(level=logging.INFO):
+def setup_logging(level="INFO"):
     """
-    Настраивает логирование.
+    Настраивает логирование с помощью loguru.
 
     Args:
         level: Уровень логирования
     """
-    logging.basicConfig(
+    # Убираем стандартный handler
+    logger.remove()
+    
+    # Добавляем красивый вывод в консоль
+    logger.add(
+        sys.stderr,
+        format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> - <level>{level}</level> - <cyan>{name}</cyan> - <level>{message}</level>",
         level=level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.StreamHandler(),
-            logging.FileHandler('new_site_report.log', encoding='utf-8')
-        ]
+        colorize=True
     )
-    return logging.getLogger(__name__)
+    
+    # Добавляем вывод в файл
+    logger.add(
+        "new_site_report.log",
+        format="{time:YYYY-MM-DD HH:mm:ss} - {level} - {name} - {message}",
+        level=level,
+        encoding="utf-8",
+        rotation="1 day",
+        retention="7 days"
+    )
+    
+    return logger
 
 
 def parse_arguments():
@@ -146,7 +159,7 @@ def main():
     args = parse_arguments()
 
     # Настраиваем логирование
-    logger = setup_logging()
+    setup_logging()
     logger.info("🚀 Запуск скрипта для работы с новым сайтом отчетов")
 
     # Проверяем директорию для загрузки

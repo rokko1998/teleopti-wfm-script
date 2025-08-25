@@ -20,53 +20,52 @@ class FormFiller:
         """Установить период отчета"""
         try:
             self.logger.info("[form_filler] 📊 Устанавливаем период отчета: произвольный")
-
+            
             # Получаем селектор и значение для периода
             period_selector = self.form_elements.get_element_selector('period_dropdown')
             period_value = self.form_elements.get_period_value('произвольный')
-            period_name = self.form_elements.get_period_name('произвольный')
-
+            
             if not period_selector or not period_value:
                 self.logger.error("[form_filler] ❌ Не удалось получить селектор или значение для периода отчета")
                 return False
-
+            
             # Ищем поле периода отчета
             period_field = self.iframe_handler.find_element_in_iframe(period_selector)
-
+            
             if not period_field:
                 self.logger.error("[form_filler] ❌ Поле периода отчета не найдено")
                 return False
-
+            
             # Проверяем, что это select элемент
             if period_field.tag_name != 'select':
                 self.logger.error(f"[form_filler] ❌ Элемент периода отчета не является select (тег: {period_field.tag_name})")
                 return False
-
+            
             # Создаем объект Select и выбираем значение
             period_select = Select(period_field)
             period_select.select_by_value(period_value)
-
-            self.logger.info(f"[form_filler] ✅ Период отчета установлен: {period_name} (значение: {period_value})")
-
+            
+            self.logger.info(f"[form_filler] ✅ Период отчета установлен: произвольный (значение: {period_value})")
+            
             # Ждем завершения postback (ASP.NET WebForms)
             self.logger.info("[form_filler] ⏳ Ждем завершения postback после выбора периода...")
             time.sleep(3)
-
+            
             # После postback ищем элементы заново (избегаем stale element reference)
             self.logger.info("[form_filler] 🔍 Проверяем готовность элементов после postback...")
-
+            
             # Проверяем, что поля дат стали доступными
             start_date_selector = self.form_elements.get_element_selector('start_date_field')
             start_date_field = self.iframe_handler.find_element_in_iframe(start_date_selector)
-
+            
             if start_date_field and not start_date_field.get_attribute('disabled') and 'aspNetDisabled' not in start_date_field.get_attribute('class'):
                 self.logger.info("[form_filler] ✅ Поля дат разблокированы после выбора периода")
             else:
                 self.logger.warning("[form_filler] ⚠️ Поля дат все еще заблокированы, возможно нужна дополнительная задержка")
                 time.sleep(2)
-
+            
             return True
-
+            
         except Exception as e:
             self.logger.error(f"[form_filler] ❌ Ошибка при установке периода отчета: {e}")
             return False
