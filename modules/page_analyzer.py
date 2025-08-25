@@ -36,6 +36,114 @@ class PageAnalyzer:
             os.makedirs(self.analysis_dir)
             self.logger.info(f"📁 Создана директория для анализа: {self.analysis_dir}")
 
+    def analyze_form_elements(self):
+        """Анализирует элементы форм на странице."""
+        try:
+            self.logger.info("🔍 Анализируем элементы форм...")
+
+            # 1. Ищем все поля ввода
+            input_fields = self.driver.find_elements(By.TAG_NAME, "input")
+            self.logger.info(f"✏️ Полей ввода: {len(input_fields)}")
+
+            # 2. Ищем все выпадающие списки
+            select_fields = self.driver.find_elements(By.TAG_NAME, "select")
+            self.logger.info(f"📋 Выпадающих списков: {len(select_fields)}")
+
+            # 3. Анализируем поля ввода
+            for i, field in enumerate(input_fields[:10]):  # Анализируем первые 10 полей
+                field_info = self.get_element_info(field)
+                if field_info.get('type') in ['text', 'date', 'datetime-local']:
+                    self.logger.info(f"📝 Поле {i+1}: {field_info.get('placeholder', 'Без placeholder')} "
+                                   f"(ID: {field_info.get('id', 'Нет ID')}, "
+                                   f"Name: {field_info.get('name', 'Нет name')})")
+
+            # 4. Анализируем выпадающие списки
+            for i, field in enumerate(select_fields[:5]):  # Анализируем первые 5 списков
+                field_info = self.get_element_info(field)
+                options = field.find_elements(By.TAG_NAME, "option")
+                option_texts = [opt.text.strip() for opt in options if opt.text.strip()]
+
+                self.logger.info(f"📋 Список {i+1}: {field_info.get('placeholder', 'Без placeholder')} "
+                               f"(ID: {field_info.get('id', 'Нет ID')}, "
+                               f"Name: {field_info.get('name', 'Нет name')}, "
+                               f"Опций: {len(options)})")
+
+                if option_texts:
+                    self.logger.info(f"   Опции: {', '.join(option_texts[:5])}{'...' if len(option_texts) > 5 else ''}")
+
+            # 5. Ищем кнопки отправки
+            submit_buttons = self.driver.find_elements(By.XPATH,
+                "//input[@type='submit'] | //button[@type='submit'] | //button[contains(text(), 'Просмотр')] | //button[contains(text(), 'Сформировать')]")
+            self.logger.info(f"🔘 Кнопок отправки: {len(submit_buttons)}")
+
+            for i, button in enumerate(submit_buttons[:3]):  # Анализируем первые 3 кнопки
+                button_info = self.get_element_info(button)
+                self.logger.info(f"🔘 Кнопка {i+1}: {button_info.get('text', 'Без текста')} "
+                               f"(ID: {button_info.get('id', 'Нет ID')}, "
+                               f"Type: {button_info.get('type', 'Нет type')})")
+
+            # Сохраняем результаты анализа форм
+            self._save_form_analysis_results({
+                'input_fields': len(input_fields),
+                'select_fields': len(select_fields),
+                'submit_buttons': len(submit_buttons)
+            })
+
+            self.logger.info("✅ Анализ элементов форм завершен")
+
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при анализе элементов форм: {e}")
+
+    def _save_form_analysis_results(self, results):
+        """Сохраняет результаты анализа форм в файл."""
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"form_analysis_{timestamp}.txt"
+            filepath = os.path.join(self.analysis_dir, filename)
+
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write("=== РЕЗУЛЬТАТЫ АНАЛИЗА ФОРМ ===\n")
+                f.write(f"Дата анализа: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(f"URL: {self.driver.current_url}\n\n")
+
+                for key, value in results.items():
+                    f.write(f"{key}: {value}\n")
+
+            self.logger.info(f"✅ Результаты анализа форм сохранены в: {filepath}")
+
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при сохранении результатов анализа форм: {e}")
+
+    def find_form_field_by_label(self, label_text):
+        """
+        Ищет поле формы по связанной метке.
+
+        Args:
+            label_text: Текст метки для поиска
+
+        Returns:
+            WebElement: Найденное поле или None
+        """
+        try:
+            # Ищем метку
+            label = self.driver.find_element(By.XPATH, f"//label[contains(text(), '{label_text}')]")
+
+            # Получаем связанное поле
+            field_id = label.get_attribute('for')
+            if field_id:
+                field = self.driver.find_element(By.ID, field_id)
+                self.logger.info(f"✅ Найдено поле по метке '{label_text}' с ID: {field_id}")
+                return field
+
+            # Если нет for атрибута, ищем следующее поле
+            field = label.find_element(By.XPATH, "following-sibling::*[1]")
+            self.logger.info(f"✅ Найдено поле по метке '{label_text}' (следующий элемент)")
+            return field
+
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при поиске поля по метке '{label_text}': {e}")
+            return None
+
     def get_page_html_structure(self, filename=None):
         """
         Получает и сохраняет полную HTML структуру страницы.
@@ -64,6 +172,9 @@ class PageAnalyzer:
 
             # Анализируем ключевые элементы
             self.analyze_html_elements()
+
+            # Анализируем элементы форм
+            self.analyze_form_elements()
 
             return filepath
 

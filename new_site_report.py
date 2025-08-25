@@ -93,6 +93,13 @@ def parse_arguments():
     )
 
     parser.add_argument(
+        '--reason',
+        default='низкая_скорость_3g_4g',
+        choices=['низкая_скорость_3g_4g', 'низкая_скорость', '3g_4g'],
+        help='Причина обращения (по умолчанию: низкая_скорость_3g_4g)'
+    )
+
+    parser.add_argument(
         '--wait-time',
         type=int,
         default=10,
@@ -212,13 +219,15 @@ def main():
 
                 logger.info(f"📅 Период отчета: с {start_date.strftime('%d.%m.%Y')} по {end_date.strftime('%d.%m.%Y')}")
                 logger.info(f"📊 Тип периода: {args.period}")
+                logger.info(f"🔍 Причина обращения: {args.reason}")
 
                 # Обрабатываем отчет
                 downloaded_file = report_handler.process_report(
                     start_date=start_date,
                     end_date=end_date,
                     download_dir=str(download_dir),
-                    period=args.period
+                    period=args.period,
+                    reason=args.reason  # Устанавливаем причину обращения
                 )
 
                 if downloaded_file:
