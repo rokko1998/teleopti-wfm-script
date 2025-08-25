@@ -40,12 +40,12 @@ class NewSiteReportHandler:
 
         # Значения для периода отчета
         self.PERIOD_VALUES = {
-            'произвольный': 'Произвольный',
-            'день': 'Произвольный',
-            'неделя': 'Произвольный',
-            'месяц': 'Произвольный',
-            '7_дней': 'Произвольный',
-            'сегодня': 'Произвольный'
+            'произвольный': '900',
+            'день': '900',
+            'неделя': '900',
+            'месяц': '900',
+            '7_дней': '900',
+            'сегодня': '900'
         }
 
         # Значения для причины обращения
@@ -165,17 +165,17 @@ class NewSiteReportHandler:
                 # Устанавливаем значение
                 period_select = Select(period_dropdown)
 
-                # Пробуем найти опцию по тексту
+                # Используем select_by_value для установки периода
                 try:
-                    period_select.select_by_visible_text(period_value)
-                    self.logger.info(f"✅ Период отчета установлен: {period_value}")
+                    period_select.select_by_value(period_value)
+                    self.logger.info(f"✅ Период отчета установлен по значению: {period_value}")
                 except:
-                    # Если не получилось, пробуем найти по частичному совпадению
+                    # Если не получилось, пробуем найти по частичному совпадению текста
                     options = period_select.options
                     for option in options:
-                        if period_value.lower() in option.text.lower():
-                            period_select.select_by_visible_text(option.text)
-                            self.logger.info(f"✅ Период отчета установлен: {option.text}")
+                        if period_value == option.value:
+                            period_select.select_by_value(option.value)
+                            self.logger.info(f"✅ Период отчета установлен по значению: {option.value}")
                             break
                     else:
                         # Если ничего не нашли, выбираем первую опцию
@@ -227,7 +227,7 @@ class NewSiteReportHandler:
             period_select = Select(period_dropdown)
             period_select.select_by_value(period_value)
 
-            self.logger.info(f"✅ Период отчета установлен: {period_value}")
+            self.logger.info(f"✅ Период отчета установлен по значению: {period_value}")
             return True
 
         except Exception as e:
