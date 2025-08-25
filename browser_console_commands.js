@@ -16,7 +16,39 @@ reportElements.forEach((el, i) => {
     console.log(`${i+1}. ID: ${el.id}, Class: ${el.className}, Tag: ${el.tagName}`);
 });
 
-// 3. АНАЛИЗ ТАБЛИЦ ДАННЫХ
+// 3. АНАЛИЗ IFRAME С ОТЧЕТОМ
+// ========================================
+console.log("=== IFRAME С ОТЧЕТОМ ===");
+const iframes = document.querySelectorAll('iframe');
+console.log(`Найдено iframe: ${iframes.length}`);
+iframes.forEach((iframe, i) => {
+    console.log(`${i+1}. ID: ${iframe.id}, Class: ${iframe.className}, Src: ${iframe.src}`);
+    
+    // Пытаемся получить доступ к содержимому iframe
+    try {
+        if (iframe.contentDocument) {
+            console.log(`   ✅ Доступ к содержимому iframe #${i+1} получен`);
+            console.log(`   📄 Заголовок: ${iframe.contentDocument.title}`);
+            
+            // Ищем элементы внутри iframe
+            const iframeButtons = iframe.contentDocument.querySelectorAll('button, input[type="button"], input[type="submit"]');
+            console.log(`   🔘 Кнопки в iframe: ${iframeButtons.length}`);
+            
+            const iframeTables = iframe.contentDocument.querySelectorAll('table');
+            console.log(`   📊 Таблицы в iframe: ${iframeTables.length}`);
+            
+            const iframeInputs = iframe.contentDocument.querySelectorAll('input, select, textarea');
+            console.log(`   📝 Поля в iframe: ${iframeInputs.length}`);
+            
+        } else {
+            console.log(`   ⚠️ Нет доступа к содержимому iframe #${i+1} (CORS)`);
+        }
+    } catch (e) {
+        console.log(`   ❌ Ошибка доступа к iframe #${i+1}: ${e.message}`);
+    }
+});
+
+// 4. АНАЛИЗ ТАБЛИЦ ДАННЫХ
 // ========================================
 console.log("=== ТАБЛИЦЫ ДАННЫХ ===");
 const dataTables = document.querySelectorAll('table[class*="data"], table[id*="data"], table[class*="table"]');
@@ -26,22 +58,40 @@ dataTables.forEach((table, i) => {
     console.log(`   Строк: ${table.rows.length}, Колонок: ${table.rows[0]?.cells.length || 0}`);
 });
 
-// 4. АНАЛИЗ ЭЛЕМЕНТОВ ПАГИНАЦИИ
+// 4. АНАЛИЗ ЭЛЕМЕНТОВ ПАГИНАЦИИ (ИСПРАВЛЕНО)
 // ========================================
 console.log("=== ЭЛЕМЕНТЫ ПАГИНАЦИИ ===");
-const paginationElements = document.querySelectorAll('[class*="pagination"], [id*="pagination"], *:contains("Страница")');
+const paginationElements = document.querySelectorAll('[class*="pagination"], [id*="pagination"]');
 console.log(`Найдено элементов пагинации: ${paginationElements.length}`);
 paginationElements.forEach((el, i) => {
     console.log(`${i+1}. ID: ${el.id}, Class: ${el.className}, Text: ${el.textContent.trim()}`);
 });
 
+// Поиск элементов с текстом "Страница" отдельно
+const pageElements = Array.from(document.querySelectorAll('*')).filter(el => 
+    el.textContent && el.textContent.includes('Страница')
+);
+console.log(`Найдено элементов со словом "Страница": ${pageElements.length}`);
+pageElements.forEach((el, i) => {
+    console.log(`${i+1}. Tag: ${el.tagName}, Class: ${el.className}, Text: ${el.textContent.trim()}`);
+});
+
 // 5. АНАЛИЗ ЭЛЕМЕНТОВ ЭКСПОРТА
 // ========================================
 console.log("=== ЭЛЕМЕНТЫ ЭКСПОРТА ===");
-const exportElements = document.querySelectorAll('[class*="export"], [id*="export"], *:contains("Экспорт"), *:contains("Excel")');
+const exportElements = document.querySelectorAll('[class*="export"], [id*="export"]');
 console.log(`Найдено элементов экспорта: ${exportElements.length}`);
 exportElements.forEach((el, i) => {
     console.log(`${i+1}. ID: ${el.id}, Class: ${el.className}, Text: ${el.textContent.trim()}`);
+});
+
+// Поиск элементов с текстом "Экспорт" или "Excel" отдельно
+const excelElements = Array.from(document.querySelectorAll('*')).filter(el => 
+    el.textContent && (el.textContent.includes('Экспорт') || el.textContent.includes('Excel'))
+);
+console.log(`Найдено элементов с "Экспорт" или "Excel": ${excelElements.length}`);
+excelElements.forEach((el, i) => {
+    console.log(`${i+1}. Tag: ${el.tagName}, Class: ${el.className}, Text: ${el.textContent.trim()}`);
 });
 
 // 6. АНАЛИЗ СКРЫТЫХ ПОЛЕЙ С ДАННЫМИ
@@ -71,7 +121,31 @@ allInputs.forEach((input, i) => {
     console.log(`${i+1}. ID: ${input.id}, Name: ${input.name}, Type: ${input.type}, Class: ${input.className}`);
 });
 
-// 9. КОПИРОВАНИЕ ВСЕГО В БУФЕР ОБМЕНА
+// 9. АНАЛИЗ URL IFRAME (КЛЮЧЕВОЕ!)
+// ========================================
+console.log("=== URL IFRAME С ОТЧЕТОМ ===");
+const reportIframe = document.querySelector('iframe.viewer');
+if (reportIframe) {
+    console.log("🎯 Найден iframe с отчетом!");
+    console.log(`🔗 URL: ${reportIframe.src}`);
+    
+    // Декодируем URL для понимания пути к отчету
+    try {
+        const decodedUrl = decodeURIComponent(reportIframe.src);
+        console.log(`📄 Декодированный URL: ${decodedUrl}`);
+        
+        // Извлекаем путь к отчету
+        const reportPath = decodedUrl.split('?')[1]?.split('&')[0];
+        if (reportPath) {
+            const decodedPath = decodeURIComponent(reportPath);
+            console.log(`📋 Путь к отчету: ${decodedPath}`);
+        }
+    } catch (e) {
+        console.log(`❌ Ошибка декодирования URL: ${e.message}`);
+    }
+}
+
+// 10. КОПИРОВАНИЕ ВСЕГО В БУФЕР ОБМЕНА
 // ========================================
 console.log("=== КОПИРОВАНИЕ В БУФЕР ОБМЕНА ===");
 
@@ -100,6 +174,11 @@ const pageInfo = {
     url: window.location.href,
     title: document.title,
     timestamp: new Date().toISOString(),
+    iframeInfo: Array.from(iframes).map(iframe => ({
+        id: iframe.id,
+        className: iframe.className,
+        src: iframe.src
+    })),
     reportElements: Array.from(reportElements).map(el => ({
         id: el.id,
         className: el.className,
@@ -132,9 +211,17 @@ copyToClipboard(JSON.stringify(pageInfo, null, 2));
 console.log("🎯 Вся информация скопирована в буфер обмена!");
 console.log("📋 Теперь можете вставить её в чат для анализа");
 
-// 10. БЫСТРАЯ ПРОВЕРКА СЕТЕВЫХ ЗАПРОСОВ
+// 11. БЫСТРАЯ ПРОВЕРКА СЕТЕВЫХ ЗАПРОСОВ
 // ========================================
 console.log("=== СЕТЕВЫЕ ЗАПРОСЫ ===");
 console.log("💡 Откройте вкладку Network в DevTools и обновите страницу");
 console.log("🔍 Ищите запросы с типами: XHR, Fetch, Document");
 console.log("📊 Особенно важны запросы к API для получения данных отчета");
+
+// 12. СПЕЦИАЛЬНЫЕ КОМАНДЫ ДЛЯ SQL SERVER REPORTING SERVICES
+// ========================================
+console.log("=== СПЕЦИАЛЬНЫЕ КОМАНДЫ ДЛЯ SSRS ===");
+console.log("💡 Для работы с iframe SSRS используйте:");
+console.log("1. Переключитесь на iframe: document.querySelector('iframe.viewer')");
+console.log("2. Ищите элементы экспорта внутри iframe");
+console.log("3. Проверьте Network вкладку на XHR запросы к ReportServer");
