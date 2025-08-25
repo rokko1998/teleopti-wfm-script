@@ -17,8 +17,9 @@ class FormElements:
 
     # Селекторы для выпадающих списков и чекбоксов
     DROPDOWN_SELECTORS = {
-        'reason_dropdown_toggle': '#ReportViewerControl_ctl04_ctl23_divDropDown_ctl00',  # Кнопка выпадающего списка причины
-        'reason_checkbox': '#ReportViewerControl_ctl04_ctl23_divDropDown_ctl372',        # Чекбокс "Низкая скорость в 3G/4G"
+        'reason_dropdown_toggle': '#ReportViewerControl_ctl04_ctl23_ddDropDownButton',  # Кнопка выпадающего списка причины
+        'reason_select_all': '#ReportViewerControl_ctl04_ctl23_divDropDown_ctl00',      # Чекбокс "Выделить все" (снять все галочки)
+        'reason_checkbox': '#ReportViewerControl_ctl04_ctl23_divDropDown_ctl372',       # Чекбокс "Низкая скорость в 3G/4G"
     }
 
     # Значения для периода отчета
