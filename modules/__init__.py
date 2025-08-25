@@ -8,7 +8,7 @@ from .page_analyzer import PageAnalyzer
 
 __all__ = [
     'get_driver',
-    'setup_proxy', 
+    'setup_proxy',
     'apply_cdp_download_settings',
     'NewSiteReportHandler',
     'PageAnalyzer'
