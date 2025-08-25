@@ -19,7 +19,7 @@ class ExcelExporter:
     def wait_for_report_ready(self, timeout=120):
         """Дождаться готовности отчета через проверку по промежуткам"""
         try:
-            self.logger.info("⏳ Ждем готовности отчета...")
+            self.logger.info("[excel_exporter] ⏳ Ждем готовности отчета...")
 
             # Проверяем каждые 5 секунд в течение timeout
             check_interval = 5
@@ -60,13 +60,13 @@ class ExcelExporter:
             ]
 
             for check_num in range(max_checks):
-                self.logger.info(f"🔍 Проверка {check_num + 1}/{max_checks} - ищем кнопку экспорта...")
+                self.logger.info(f"[excel_exporter] 🔍 Проверка {check_num + 1}/{max_checks} - ищем кнопку экспорта...")
 
                 # Сначала пробуем найти по тексту (более надежно)
                 export_button = self.find_export_button_by_text()
                 if export_button:
-                    self.logger.info("✅ Кнопка экспорта найдена по тексту")
-                    self.logger.info("✅ Отчет готов к экспорту")
+                    self.logger.info("[excel_exporter] ✅ Кнопка экспорта найдена по тексту")
+                    self.logger.info("[excel_exporter] ✅ Отчет готов к экспорту")
                     return True
 
                 # Если не найдено по тексту, пробуем CSS селекторы
@@ -74,22 +74,22 @@ class ExcelExporter:
                     try:
                         export_button = self.driver.find_element(By.CSS_SELECTOR, selector)
                         if export_button.is_displayed() and export_button.is_enabled():
-                            self.logger.info(f"✅ Кнопка экспорта найдена: {selector}")
-                            self.logger.info("✅ Отчет готов к экспорту")
+                            self.logger.info(f"[excel_exporter] ✅ Кнопка экспорта найдена: {selector}")
+                            self.logger.info("[excel_exporter] ✅ Отчет готов к экспорту")
                             return True
                     except:
                         continue
 
                 # Если кнопка не найдена, ждем и проверяем снова
                 if check_num < max_checks - 1:  # Не ждем после последней проверки
-                    self.logger.info(f"⏳ Кнопка экспорта не найдена, ждем {check_interval} секунд...")
+                    self.logger.info(f"[excel_exporter] ⏳ Кнопка экспорта не найдена, ждем {check_interval} секунд...")
                     time.sleep(check_interval)
 
-            self.logger.error(f"❌ Отчет не загрузился за {timeout} секунд")
+            self.logger.error(f"[excel_exporter] ❌ Отчет не загрузился за {timeout} секунд")
             return False
 
         except Exception as e:
-            self.logger.error(f"❌ Ошибка при ожидании готовности отчета: {e}")
+            self.logger.error(f"[excel_exporter] ❌ Ошибка при ожидании готовности отчета: {e}")
             return False
 
     def find_save_button(self):
@@ -144,63 +144,47 @@ class ExcelExporter:
             return False
 
     def select_excel_format(self):
-        """Выбрать формат Excel из выпадающего меню"""
+        """Выбрать формат Excel из выпадающего списка"""
         try:
-            self.logger.info("📊 Выбираем формат Excel...")
+            self.logger.info("[excel_exporter] 📊 Выбираем формат Excel...")
 
-            # Ищем ссылку на Excel в выпадающем меню
+            # Ищем ссылку Excel в выпадающем меню
             excel_selectors = [
-                "a[href*='Excel']",
-                "a[title*='Excel']",
-                "a[title*='excel']",
-                "a[title*='Эксель']",
-                "a[title*='эксель']"
+                "a[onclick*='EXCELOPENXML']",
+                "a[onclick*='Excel']",
+                "a[alt*='Excel']",
+                "a:contains('Excel')",
+                "a[title*='Excel']"
             ]
 
+            excel_link = None
             for selector in excel_selectors:
                 try:
                     excel_link = self.driver.find_element(By.CSS_SELECTOR, selector)
-                    if excel_link.is_displayed():
-                        self.logger.info("✅ Ссылка Excel найдена")
-                        excel_link.click()
-                        self.logger.info("✅ Формат Excel выбран")
-                        return True
+                    if excel_link.is_displayed() and excel_link.is_enabled():
+                        break
                 except:
                     continue
 
-            # Поиск по XPath (более надежный)
-            try:
-                excel_link = self.driver.find_element(By.XPATH, "//a[contains(text(), 'Excel') or contains(text(), 'excel') or contains(text(), 'Эксель') or contains(text(), 'эксель')]")
-                if excel_link.is_displayed():
-                    self.logger.info("✅ Ссылка Excel найдена по XPath")
-                    excel_link.click()
-                    self.logger.info("✅ Формат Excel выбран")
-                    return True
-            except:
-                pass
+            if not excel_link:
+                self.logger.error("[excel_exporter] ❌ Ссылка Excel не найдена в выпадающем меню")
+                return False
 
-            # Поиск по частичному совпадению href
-            try:
-                excel_link = self.driver.find_element(By.XPATH, "//a[contains(@href, 'Excel') or contains(@href, 'excel')]")
-                if excel_link.is_displayed():
-                    self.logger.info("✅ Ссылка Excel найдена по href")
-                    excel_link.click()
-                    self.logger.info("✅ Формат Excel выбран")
-                    return True
-            except:
-                pass
+            # Кликаем по ссылке Excel
+            self.logger.info("[excel_exporter] 💾 Выбираем формат Excel...")
+            excel_link.click()
 
-            self.logger.error("❌ Ссылка Excel не найдена в выпадающем меню")
-            return False
+            self.logger.info("[excel_exporter] ✅ Формат Excel выбран")
+            return True
 
         except Exception as e:
-            self.logger.error(f"❌ Ошибка при выборе формата Excel: {e}")
+            self.logger.error(f"[excel_exporter] ❌ Ошибка при выборе формата Excel: {e}")
             return False
 
     def export_to_excel(self, wait_time=120):
         """Экспортировать отчет в Excel"""
         try:
-            self.logger.info("📤 Начинаем экспорт отчета в Excel...")
+            self.logger.info("[excel_exporter] 📤 Начинаем экспорт отчета в Excel...")
 
             # Ждем готовности отчета (кнопка экспорта уже найдена)
             if not self.wait_for_report_ready(timeout=wait_time):
@@ -210,12 +194,23 @@ class ExcelExporter:
             export_selectors = [
                 "a[onclick*='exportReport']",
                 "a[onclick*='EXCELOPENXML']",
+                "a[onclick*='Excel']",
+                "a[id*='Export']",
+                "a[id*='ctl04'][id*='ctl00']",
+                "a[id*='ctl04'][id*='ctl100']",
+                "a[class*='ActiveLink']",
+                "a[class*='Export']",
+                "a[class*='Button']",
                 "a[title*='Экспорт']",
                 "a[title*='Export']",
                 "a[alt*='Excel']",
-                "a[class*='ActiveLink']",
+                "a[alt*='Экспорт']",
                 "div[id*='Export'] a",
-                "div[class*='ToolbarExport'] a"
+                "div[class*='ToolbarExport'] a",
+                "div[class*='WidgetSet'] a",
+                "table[id*='Button'] a",
+                "a:contains('Excel')",
+                "a:contains('Экспорт')"
             ]
 
             export_button = None
@@ -228,11 +223,11 @@ class ExcelExporter:
                     continue
 
             if not export_button:
-                self.logger.error("❌ Кнопка экспорта не найдена")
+                self.logger.error("[excel_exporter] ❌ Кнопка экспорта не найдена")
                 return False
 
             # Кликаем по кнопке экспорта
-            self.logger.info("💾 Нажимаем кнопку экспорта...")
+            self.logger.info("[excel_exporter] 💾 Нажимаем кнопку экспорта...")
             export_button.click()
 
             # Ждем появления выпадающего меню
@@ -242,11 +237,11 @@ class ExcelExporter:
             if not self.select_excel_format():
                 return False
 
-            self.logger.info("✅ Экспорт в Excel завершен успешно")
+            self.logger.info("[excel_exporter] ✅ Экспорт в Excel завершен успешно")
             return True
 
         except Exception as e:
-            self.logger.error(f"❌ Ошибка при экспорте в Excel: {e}")
+            self.logger.error(f"[excel_exporter] ❌ Ошибка при экспорте в Excel: {e}")
             return False
 
     def find_export_button_by_text(self):
@@ -266,19 +261,19 @@ class ExcelExporter:
                     # Ищем признаки кнопки экспорта
                     if any(keyword in link_text for keyword in ['excel', 'экспорт', 'export']):
                         if link.is_displayed() and link.is_enabled():
-                            self.logger.info(f"✅ Кнопка экспорта найдена по тексту: '{link_text}'")
+                            self.logger.info(f"[excel_exporter] ✅ Кнопка экспорта найдена по тексту: '{link_text}'")
                             return link
 
                     # Проверяем title и alt
                     if any(keyword in link_title.lower() for keyword in ['excel', 'экспорт', 'export']):
                         if link.is_displayed() and link.is_enabled():
-                            self.logger.info(f"✅ Кнопка экспорта найдена по title: '{link_title}'")
+                            self.logger.info(f"[excel_exporter] ✅ Кнопка экспорта найдена по title: '{link_title}'")
                             return link
 
                     # Проверяем onclick
                     if 'exportReport' in link_onclick or 'EXCELOPENXML' in link_onclick:
                         if link.is_displayed() and link.is_enabled():
-                            self.logger.info(f"✅ Кнопка экспорта найдена по onclick: '{link_onclick}'")
+                            self.logger.info(f"[excel_exporter] ✅ Кнопка экспорта найдена по onclick: '{link_onclick}'")
                             return link
 
                 except:
@@ -287,5 +282,5 @@ class ExcelExporter:
             return None
 
         except Exception as e:
-            self.logger.error(f"❌ Ошибка при поиске кнопки экспорта по тексту: {e}")
-            return None
+            self.logger.error(f"[excel_exporter] ❌ Ошибка при поиске кнопки экспорта по тексту: {e}")
+            return False

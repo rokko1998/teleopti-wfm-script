@@ -17,35 +17,57 @@ class IframeHandler:
         self.logger = logger
 
     def switch_to_iframe(self):
-        """Переключиться на iframe"""
+        """Переключиться на iframe с отчетом"""
         try:
-            iframe = self.driver.find_element(By.TAG_NAME, "iframe")
+            self.logger.info("[iframe_handler] 🔄 Переключаемся на iframe...")
+
+            # Ищем iframe по различным селекторам
+            iframe_selectors = [
+                "iframe.viewer",
+                "iframe[id*='ReportViewer']",
+                "iframe[src*='report']",
+                "iframe"
+            ]
+
+            iframe = None
+            for selector in iframe_selectors:
+                try:
+                    iframe = self.driver.find_element(By.CSS_SELECTOR, selector)
+                    if iframe.is_displayed():
+                        break
+                except:
+                    continue
+
+            if not iframe:
+                self.logger.error("[iframe_handler] ❌ Iframe не найден")
+                return False
+
+            # Переключаемся на iframe
             self.driver.switch_to.frame(iframe)
-            self.logger.info("✅ Переключились на iframe")
+            self.logger.info("[iframe_handler] ✅ Переключились на iframe")
             return True
+
         except Exception as e:
-            self.logger.error(f"❌ Ошибка при переключении на iframe: {e}")
+            self.logger.error(f"[iframe_handler] ❌ Ошибка при переключении на iframe: {e}")
             return False
 
     def switch_to_main_document(self):
         """Вернуться в основной документ"""
         try:
             self.driver.switch_to.default_content()
-            self.logger.info("✅ Вернулись в основной документ")
+            self.logger.info("[iframe_handler] ✅ Вернулись в основной документ")
             return True
         except Exception as e:
-            self.logger.error(f"❌ Ошибка при возврате в основной документ: {e}")
+            self.logger.error(f"[iframe_handler] ❌ Ошибка при возврате в основной документ: {e}")
             return False
 
-    def find_element_in_iframe(self, selector, timeout=10):
-        """Найти элемент в iframe по CSS селектору"""
+    def find_element_in_iframe(self, selector):
+        """Найти элемент в iframe по селектору"""
         try:
-            element = WebDriverWait(self.driver, timeout).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, selector))
-            )
+            element = self.driver.find_element(By.CSS_SELECTOR, selector)
             return element
         except Exception as e:
-            self.logger.error(f"❌ Элемент не найден в iframe: {selector}, ошибка: {e}")
+            self.logger.error(f"[iframe_handler] ❌ Элемент не найден в iframe: {selector} - {e}")
             return None
 
     def find_element_with_diagnostics(self, selector, timeout=10):
@@ -70,18 +92,23 @@ class IframeHandler:
             return None
 
     def wait_for_element_clickable(self, selector, timeout=10):
-        """Дождаться, пока элемент станет кликабельным"""
+        """Дождаться кликабельности элемента в iframe"""
         try:
             element = WebDriverWait(self.driver, timeout).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, selector))
             )
             return element
         except Exception as e:
-            self.logger.error(f"❌ Элемент не стал кликабельным: {selector}, ошибка: {e}")
+            self.logger.error(f"[iframe_handler] ❌ Элемент не стал кликабельным: {selector} - {e}")
             return None
 
     def wait_for_fields_unlock(self, wait_time=5):
-        """Подождать разблокировки полей после выбора периода"""
-        self.logger.info(f"⏳ Ждем {wait_time} секунд для автоматической разблокировки полей...")
-        time.sleep(wait_time)
-        self.logger.info("✅ Ожидание завершено")
+        """Ждать разблокировки полей"""
+        try:
+            self.logger.info(f"[iframe_handler] ⏳ Ждем разблокировки полей {wait_time} секунд...")
+            time.sleep(wait_time)
+            self.logger.info("[iframe_handler] ✅ Ожидание завершено")
+            return True
+        except Exception as e:
+            self.logger.error(f"[iframe_handler] ❌ Ошибка при ожидании разблокировки полей: {e}")
+            return False
