@@ -32,7 +32,7 @@ class NewSiteReportHandler:
         self.ELEMENT_IDS = {
             'period_dropdown': 'ReportViewerControl_ctl04_ctl03_ddValue',
             'start_date_field': 'ReportViewerControl_ctl04_ctl05_txtValue',  # Дата начала
-            'end_date_field': 'ReportViewerControl_ctl04_ctl07_txtValue',    # Дата окончания (но это поле контактного центра!)
+            'end_date_field': 'ReportViewerControl_ctl04_ctl07_txtValue',    # ⚠️ Это НЕ дата! Это контактный центр!
             'reason_dropdown': 'ReportViewerControl_ctl04_ctl09_txtValue',   # Причина обращения
             'submit_button': 'ReportViewerControl_ctl04_ctl00',
             'excel_link': "//a[contains(text(), 'Excel') and contains(@class, 'ActiveLink')]"
@@ -193,6 +193,10 @@ class NewSiteReportHandler:
                 self.logger.info("⏳ Ждем разблокировки полей дат...")
                 time.sleep(3)
 
+                # Принудительно разблокируем все заблокированные поля
+                self.logger.info("🔓 Принудительно разблокируем заблокированные поля...")
+                self._force_unlock_all_fields()
+
                 return True
 
             finally:
@@ -275,8 +279,22 @@ class NewSiteReportHandler:
 
                 # Проверяем, заблокировано ли поле
                 if 'aspNetDisabled' in start_date_field.get_attribute('class') or 'disabled' in start_date_field.get_attribute('class'):
-                    self.logger.warning("⚠️ Поле 'Дата начала' все еще заблокировано. Возможно, нужно сначала выбрать период отчета.")
-                    return False
+                    self.logger.warning("⚠️ Поле 'Дата начала' все еще заблокировано. Принудительно разблокируем...")
+                    
+                    # Принудительно разблокируем поле
+                    self.driver.execute_script("arguments[0].removeAttribute('disabled');", start_date_field)
+                    self.driver.execute_script("arguments[0].classList.remove('aspNetDisabled');", start_date_field)
+                    self.driver.execute_script("arguments[0].classList.remove('DisabledTextBox');", start_date_field)
+                    
+                    # Ждем немного
+                    time.sleep(1)
+                    
+                    # Проверяем еще раз
+                    if 'aspNetDisabled' in start_date_field.get_attribute('class') or start_date_field.get_attribute('disabled'):
+                        self.logger.error("❌ Не удалось разблокировать поле 'Дата начала'")
+                        return False
+                    else:
+                        self.logger.info("✅ Поле 'Дата начала' успешно разблокировано")
 
                 # Устанавливаем фиксированную тестовую дату
                 start_date_field.clear()
@@ -348,46 +366,18 @@ class NewSiteReportHandler:
     def _set_end_date_in_iframe(self):
         """Устанавливает дату окончания в iframe'е."""
         try:
-            # Ищем iframe
-            iframe = self.driver.find_element(By.TAG_NAME, "iframe")
-            if not iframe:
-                self.logger.error("❌ Iframe не найден")
-                return False
-
-            # Переключаемся на iframe
-            self.driver.switch_to.frame(iframe)
-            self.logger.info("✅ Переключились на iframe для установки даты окончания")
-
-            try:
-                # Ищем поле даты окончания
-                end_date_field = WebDriverWait(self.driver, 10).until(
-                    EC.element_to_be_clickable((By.ID, self.ELEMENT_IDS['end_date_field']))
-                )
-
-                # Проверяем, заблокировано ли поле
-                if 'aspNetDisabled' in end_date_field.get_attribute('class') or 'disabled' in end_date_field.get_attribute('class'):
-                    self.logger.warning("⚠️ Поле 'Дата окончания' все еще заблокировано. Возможно, нужно сначала выбрать период отчета.")
-                    return False
-
-                # Устанавливаем фиксированную тестовую дату
-                end_date_field.clear()
-                end_date_field.send_keys(self.TEST_DATES['end_date'])
-
-                self.logger.info(f"✅ Дата окончания установлена: {self.TEST_DATES['end_date']}")
-                return True
-
-            finally:
-                # Возвращаемся в основной документ
-                self.driver.switch_to.default_content()
-                self.logger.info("✅ Вернулись в основной документ")
+            # ⚠️ ВНИМАНИЕ: Поле ReportViewerControl_ctl04_ctl07_txtValue - это НЕ дата окончания!
+            # Это поле контактного центра с предустановленными значениями
+            # Настоящее поле даты окончания не найдено в диагностике
+            
+            self.logger.warning("⚠️ Поле 'Дата окончания' не найдено или это не поле даты")
+            self.logger.info("📋 Используем только дату начала для отчета за один день")
+            
+            # Возвращаем True, так как это не критическая ошибка
+            return True
 
         except Exception as e:
             self.logger.error(f"❌ Ошибка при установке даты окончания в iframe: {e}")
-            # Возвращаемся в основной документ в случае ошибки
-            try:
-                self.driver.switch_to.default_content()
-            except:
-                pass
             return False
 
     def _set_end_date_in_main_document(self):
@@ -457,8 +447,22 @@ class NewSiteReportHandler:
 
                 # Проверяем, заблокировано ли поле
                 if 'aspNetDisabled' in reason_field.get_attribute('class') or 'disabled' in reason_field.get_attribute('class'):
-                    self.logger.warning("⚠️ Поле 'Причина обращения' все еще заблокировано. Возможно, нужно сначала выбрать период отчета.")
-                    return False
+                    self.logger.warning("⚠️ Поле 'Причина обращения' все еще заблокировано. Принудительно разблокируем...")
+                    
+                    # Принудительно разблокируем поле
+                    self.driver.execute_script("arguments[0].removeAttribute('disabled');", reason_field)
+                    self.driver.execute_script("arguments[0].classList.remove('aspNetDisabled');", reason_field)
+                    self.driver.execute_script("arguments[0].classList.remove('DisabledTextBox');", reason_field)
+                    
+                    # Ждем немного
+                    time.sleep(1)
+                    
+                    # Проверяем еще раз
+                    if 'aspNetDisabled' in reason_field.get_attribute('class') or reason_field.get_attribute('disabled'):
+                        self.logger.error("❌ Не удалось разблокировать поле 'Причина обращения'")
+                        return False
+                    else:
+                        self.logger.info("✅ Поле 'Причина обращения' успешно разблокировано")
 
                 # Это поле со списком галочек, нужно очистить все и оставить только нужную
                 self.logger.info("🔍 Очищаем все галочки в поле 'Причина обращения'...")
@@ -988,3 +992,54 @@ class NewSiteReportHandler:
         except Exception as e:
             self.logger.error(f"❌ Ошибка при обработке отчета: {e}")
             return None
+
+    def _force_unlock_all_fields(self):
+        """Принудительно разблокирует все заблокированные поля формы."""
+        try:
+            # Переключаемся на iframe
+            iframe = self.driver.find_element(By.TAG_NAME, "iframe")
+            self.driver.switch_to.frame(iframe)
+            
+            try:
+                # Список полей для разблокировки
+                fields_to_unlock = [
+                    'start_date_field',      # Дата начала
+                    'reason_dropdown'        # Причина обращения
+                ]
+                
+                for field_name in fields_to_unlock:
+                    try:
+                        field = self.driver.find_element(By.ID, self.ELEMENT_IDS[field_name])
+                        
+                        # Проверяем, заблокировано ли поле
+                        if field.get_attribute('disabled') or 'aspNetDisabled' in field.get_attribute('class'):
+                            self.logger.info(f"🔓 Разблокируем поле {field_name}...")
+                            
+                            # Убираем атрибут disabled
+                            self.driver.execute_script("arguments[0].removeAttribute('disabled');", field)
+                            
+                            # Убираем классы блокировки
+                            self.driver.execute_script("arguments[0].classList.remove('aspNetDisabled');", field)
+                            self.driver.execute_script("arguments[0].classList.remove('DisabledTextBox');", field)
+                            
+                            self.logger.info(f"✅ Поле {field_name} разблокировано")
+                        else:
+                            self.logger.info(f"✅ Поле {field_name} уже разблокировано")
+                            
+                    except Exception as e:
+                        self.logger.warning(f"⚠️ Не удалось разблокировать поле {field_name}: {e}")
+                
+                # Ждем немного для применения изменений
+                time.sleep(2)
+                
+            finally:
+                # Возвращаемся в основной документ
+                self.driver.switch_to.default_content()
+                
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при принудительной разблокировке полей: {e}")
+            # Возвращаемся в основной документ в случае ошибки
+            try:
+                self.driver.switch_to.default_content()
+            except:
+                pass

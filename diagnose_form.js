@@ -15,7 +15,7 @@ try {
 
     console.log('✅ Iframe найден');
     const doc = iframe.contentDocument;
-    
+
     if (!doc) {
         console.log('❌ Нет доступа к содержимому iframe');
         console.log('Возможно, iframe еще не загружен или заблокирован CORS');
@@ -39,7 +39,7 @@ try {
         console.log('   Классы:', periodField.className);
         console.log('   Текущее значение:', periodField.value);
         console.log('   Текущий текст:', periodField.options?.[periodField.selectedIndex]?.text);
-        
+
         if (periodField.options) {
             console.log('   Доступные опции:');
             for (let i = 0; i < periodField.options.length; i++) {
@@ -47,7 +47,7 @@ try {
                 console.log(`     ${i}: value="${option.value}", text="${option.text}"`);
             }
         }
-        
+
         console.log('   Selenium селектор:', `By.ID("${periodField.id}")`);
         console.log('   Selenium взаимодействие:', 'Select(driver.find_element(By.ID("' + periodField.id + '"))).select_by_value("900")');
     } else {
@@ -67,7 +67,7 @@ try {
         console.log('   Текущее значение:', startDateField.value);
         console.log('   Placeholder:', startDateField.placeholder);
         console.log('   Maxlength:', startDateField.maxLength);
-        
+
         console.log('   Selenium селектор:', `By.ID("${startDateField.id}")`);
         console.log('   Selenium взаимодействие:', 'driver.find_element(By.ID("' + startDateField.id + '")).clear(); driver.find_element(By.ID("' + startDateField.id + '")).send_keys("01.08.2025")');
     } else {
@@ -87,7 +87,7 @@ try {
         console.log('   Текущее значение:', endDateField.value);
         console.log('   Placeholder:', endDateField.placeholder);
         console.log('   Maxlength:', endDateField.maxLength);
-        
+
         console.log('   Selenium селектор:', `By.ID("${endDateField.id}")`);
         console.log('   Selenium взаимодействие:', 'driver.find_element(By.ID("' + endDateField.id + '")).clear(); driver.find_element(By.ID("' + endDateField.id + '")).send_keys("02.08.2025")');
     } else {
@@ -107,7 +107,7 @@ try {
         console.log('   Текущее значение:', reasonField.value);
         console.log('   Placeholder:', reasonField.placeholder);
         console.log('   Maxlength:', reasonField.maxLength);
-        
+
         console.log('   Selenium селектор:', `By.ID("${reasonField.id}")`);
         console.log('   Selenium взаимодействие:', 'driver.find_element(By.ID("' + reasonField.id + '")).clear(); driver.find_element(By.ID("' + reasonField.id + '")).send_keys("Низкая скорость в 3G/4G")');
     } else {
@@ -125,7 +125,7 @@ try {
         console.log('   Классы:', submitButton.className);
         console.log('   Текст:', submitButton.textContent);
         console.log('   Value:', submitButton.value);
-        
+
         console.log('   Selenium селектор:', `By.ID("${submitButton.id}")`);
         console.log('   Selenium взаимодействие:', 'driver.find_element(By.ID("' + submitButton.id + '")).click()');
     } else {
@@ -135,10 +135,10 @@ try {
     // 6. Ищем все input поля для дополнительного анализа
     console.log('\n🔍 ДОПОЛНИТЕЛЬНЫЕ ПОЛЯ:');
     console.log('========================');
-    
+
     const allInputs = doc.querySelectorAll('input, select, textarea');
     console.log(`   Найдено полей: ${allInputs.length}`);
-    
+
     allInputs.forEach((input, index) => {
         if (input.id && input.id.includes('ReportViewerControl')) {
             console.log(`   ${index + 1}. ID: ${input.id}`);
@@ -154,7 +154,7 @@ try {
     // 7. Анализ состояния блокировки
     console.log('\n🔒 АНАЛИЗ СОСТОЯНИЯ БЛОКИРОВКИ:');
     console.log('==================================');
-    
+
     if (startDateField) {
         const startBlocked = startDateField.disabled || startDateField.className.includes('aspNetDisabled');
         console.log(`   Дата начала заблокирована: ${startBlocked}`);
@@ -164,12 +164,12 @@ try {
             console.log('      driver.execute_script("arguments[0].classList.remove(\'aspNetDisabled\');", element)');
         }
     }
-    
+
     if (endDateField) {
         const endBlocked = endDateField.disabled || endDateField.className.includes('aspNetDisabled');
         console.log(`   Дата окончания заблокирована: ${endBlocked}`);
     }
-    
+
     if (reasonField) {
         const reasonBlocked = reasonField.disabled || reasonField.className.includes('aspNetDisabled');
         console.log(`   Причина обращения заблокирована: ${reasonBlocked}`);
