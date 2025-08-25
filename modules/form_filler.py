@@ -50,26 +50,26 @@ class FormFiller:
                 # Создаем объект Select и выбираем значение
                 period_select = Select(period_field)
                 period_select.select_by_value(period_value)
-                
+
                 self.logger.info(f"✅ Период отчета установлен: {period_name} (значение: {period_value})")
-                
+
                 # Ждем завершения postback (ASP.NET WebForms)
                 self.logger.info("⏳ Ждем завершения postback после выбора периода...")
                 time.sleep(3)
-                
+
                 # После postback ищем элементы заново (избегаем stale element reference)
                 self.logger.info("🔍 Проверяем готовность элементов после postback...")
-                
+
                 # Проверяем, что поля дат стали доступными
                 start_date_selector = self.form_elements.get_element_selector('start_date_field')
                 start_date_field = self.iframe_handler.find_element_in_iframe(start_date_selector)
-                
+
                 if start_date_field and not start_date_field.get_attribute('disabled') and 'aspNetDisabled' not in start_date_field.get_attribute('class'):
                     self.logger.info("✅ Поля дат разблокированы после выбора периода")
                 else:
                     self.logger.warning("⚠️ Поля дат все еще заблокированы, возможно нужна дополнительная задержка")
                     time.sleep(2)
-                
+
                 return True
 
             finally:
@@ -199,84 +199,84 @@ class FormFiller:
             return False
 
     def set_reason(self):
-        """Установить причину обращения через выпадающий список с чекбоксами"""
+        """Установить причину обращения (multi-select/checkbox)"""
         try:
-            self.logger.info("🔍 Устанавливаем причину обращения")
+            self.logger.info("🔍 Устанавливаем причину обращения...")
 
-            # Переключаемся на iframe
-            if not self.iframe_handler.switch_to_iframe():
+            # Ищем поле причины обращения
+            reason_selector = self.form_elements.get_element_selector('reason_field')
+            reason_field = self.iframe_handler.find_element_in_iframe(reason_selector)
+
+            if not reason_field:
+                self.logger.error("❌ Поле причины обращения не найдено")
                 return False
 
-            try:
-                # 1. Сначала нажимаем на кнопку выпадающего списка
-                dropdown_toggle_selector = self.form_elements.get_dropdown_selector('reason_dropdown_toggle')
-                if not dropdown_toggle_selector:
-                    self.logger.error("❌ Селектор кнопки выпадающего списка не найден")
-                    return False
+            # Ищем кнопку выпадающего списка
+            dropdown_toggle = self.iframe_handler.find_element_in_iframe(
+                self.form_elements.DROPDOWN_SELECTORS['dropdown_toggle']
+            )
 
-                dropdown_toggle = self.iframe_handler.find_element_in_iframe(dropdown_toggle_selector)
-                if not dropdown_toggle:
-                    self.logger.error("❌ Кнопка выпадающего списка не найдена")
-                    return False
+            if not dropdown_toggle:
+                self.logger.error("❌ Кнопка выпадающего списка причины не найдена")
+                return False
 
-                self.logger.info("📋 Открываем выпадающий список причины обращения...")
-                dropdown_toggle.click()
+            # Кликаем по кнопке выпадающего списка
+            self.logger.info("📋 Открываем выпадающий список причин...")
+            dropdown_toggle.click()
+            time.sleep(2)
 
-                # Ждем появления выпадающего списка
-                time.sleep(2)
+            # Ищем чекбокс "Выделить все" и снимаем все галочки
+            select_all_selector = self.form_elements.DROPDOWN_SELECTORS['select_all_checkbox']
+            select_all_checkbox = self.iframe_handler.find_element_in_iframe(select_all_selector)
 
-                # 2. Теперь нажимаем "Выделить все" чтобы снять все галочки
-                select_all_selector = self.form_elements.get_dropdown_selector('reason_select_all')
-                if not select_all_selector:
-                    self.logger.error("❌ Селектор 'Выделить все' не найден")
-                    return False
-
-                select_all_checkbox = self.iframe_handler.find_element_in_iframe(select_all_selector)
-                if not select_all_checkbox:
-                    self.logger.error("❌ Чекбокс 'Выделить все' не найден")
-                    return False
-
-                self.logger.info("🗑️ Снимаем все галочки через 'Выделить все'...")
+            if select_all_checkbox and select_all_checkbox.is_selected():
+                self.logger.info("🔓 Снимаем все галочки...")
                 select_all_checkbox.click()
-
-                # Ждем применения изменений
                 time.sleep(1)
 
-                # 3. Теперь выбираем нужный чекбокс
-                checkbox_selector = self.form_elements.get_dropdown_selector('reason_checkbox')
-                if not checkbox_selector:
-                    self.logger.error("❌ Селектор чекбокса не найден")
-                    return False
+            # Ищем конкретный чекбокс "Интернет >> Низкая скорость в 3G/4G"
+            # Пробуем разные селекторы
+            reason_checkbox = None
+            selectors_to_try = [
+                "input[id*='chk'][id*='ctl04'][id*='ctl123']",  # По ID
+                "input[id*='chk'][id*='ctl04'][id*='ctl372']",  # Альтернативный ID
+                "input[type='checkbox'][id*='chk']",  # По типу
+                "input[checked='checked'][id*='chk']"  # По состоянию
+            ]
 
-                checkbox = self.iframe_handler.find_element_in_iframe(checkbox_selector)
-                if not checkbox:
-                    self.logger.error("❌ Чекбокс 'Низкая скорость в 3G/4G' не найден")
-                    return False
+            for selector in selectors_to_try:
+                try:
+                    reason_checkbox = self.iframe_handler.find_element_in_iframe(selector)
+                    if reason_checkbox:
+                        # Проверяем, что это нужный чекбокс по лейблу
+                        checkbox_id = reason_checkbox.get_attribute('id')
+                        label_selector = f"label[for='{checkbox_id}']"
+                        label = self.iframe_handler.find_element_in_iframe(label_selector)
 
-                # Проверяем, не выбран ли уже чекбокс
-                if not checkbox.is_selected():
-                    self.logger.info("✅ Выбираем чекбокс 'Низкая скорость в 3G/4G'...")
-                    checkbox.click()
-                else:
-                    self.logger.info("✅ Чекбокс 'Низкая скорость в 3G/4G' уже выбран")
+                        if label and "Низкая скорость" in label.text:
+                            self.logger.info(f"✅ Найден чекбокс причины: {label.text}")
+                            break
+                        else:
+                            reason_checkbox = None
+                except:
+                    continue
 
-                # Ждем применения выбора
+            if not reason_checkbox:
+                self.logger.error("❌ Чекбокс 'Интернет >> Низкая скорость в 3G/4G' не найден")
+                return False
+
+            # Устанавливаем чекбокс
+            if not reason_checkbox.is_selected():
+                self.logger.info("✅ Устанавливаем чекбокс причины обращения")
+                reason_checkbox.click()
                 time.sleep(1)
+            else:
+                self.logger.info("✅ Чекбокс причины обращения уже установлен")
 
-                self.logger.info("✅ Причина обращения установлена: Низкая скорость в 3G/4G")
-                return True
-
-            finally:
-                # Возвращаемся в основной документ
-                self.iframe_handler.switch_to_main_document()
+            return True
 
         except Exception as e:
             self.logger.error(f"❌ Ошибка при установке причины обращения: {e}")
-            # Возвращаемся в основной документ в случае ошибки
-            try:
-                self.iframe_handler.switch_to_main_document()
-            except:
-                pass
             return False
 
     def submit_report(self):
