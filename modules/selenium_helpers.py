@@ -10,7 +10,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
+
 from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import NoSuchFrameException
 
@@ -143,8 +143,30 @@ def get_driver(headless: bool = True) -> webdriver.Chrome:
     opts.add_argument("--test-type")
 
     try:
-        # Автоматическая установка ChromeDriver для Chrome 138+
-        service = Service(ChromeDriverManager().install())
+        # Ищем chromedriver в разных местах (работает без интернета)
+        chromedriver_paths = [
+            BASE_DIR / "chromedriver.exe",  # Windows
+            BASE_DIR / "chromedriver",      # Mac/Linux
+            BASE_DIR / "drivers" / "chromedriver.exe",  # Windows в папке drivers
+            BASE_DIR / "drivers" / "chromedriver",      # Mac/Linux в папке drivers
+            Path("C:/chromedriver/chromedriver.exe"),   # Стандартная папка Windows
+            Path("/usr/local/bin/chromedriver"),        # Стандартная папка Mac/Linux
+        ]
+        
+        chromedriver_path = None
+        for path in chromedriver_paths:
+            if path.exists():
+                chromedriver_path = path
+                logger.info(f"✅ Найден chromedriver: {path}")
+                break
+        
+        if not chromedriver_path:
+            # Если chromedriver не найден, пробуем использовать системный
+            logger.info("🔍 Локальный chromedriver не найден, используем системный...")
+            service = Service()
+        else:
+            service = Service(str(chromedriver_path))
+        
         driver = webdriver.Chrome(service=service, options=opts)
 
         # Убираем индикатор автоматизации
