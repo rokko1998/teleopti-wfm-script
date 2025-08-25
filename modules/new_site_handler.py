@@ -169,13 +169,14 @@ class NewSiteReportHandler:
                 try:
                     period_select.select_by_value(period_value)
                     self.logger.info(f"✅ Период отчета установлен по значению: {period_value}")
-                except:
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Ошибка при установке значения {period_value}: {e}")
                     # Если не получилось, пробуем найти по частичному совпадению текста
                     options = period_select.options
                     for option in options:
-                        if period_value == option.value:
-                            period_select.select_by_value(option.value)
-                            self.logger.info(f"✅ Период отчета установлен по значению: {option.value}")
+                        if period_value == option.get_attribute('value'):
+                            period_select.select_by_value(option.get_attribute('value'))
+                            self.logger.info(f"✅ Период отчета установлен по значению: {option.get_attribute('value')}")
                             break
                     else:
                         # Если ничего не нашли, выбираем первую опцию

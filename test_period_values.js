@@ -8,6 +8,8 @@ try {
     const iframe = document.querySelector('iframe.viewer') || document.querySelector('iframe');
     if (!iframe) {
         console.log('❌ Iframe не найден');
+        console.log('Проверьте, что страница полностью загружена');
+        console.log('Попробуйте подождать еще немного и запустить скрипт снова');
         return;
     }
 
@@ -16,6 +18,8 @@ try {
     const doc = iframe.contentDocument;
     if (!doc) {
         console.log('❌ Нет доступа к содержимому iframe');
+        console.log('Возможно, iframe еще не загружен или заблокирован CORS');
+        console.log('Попробуйте подождать еще немного и запустить скрипт снова');
         return;
     }
 
@@ -25,6 +29,8 @@ try {
     const periodSelect = doc.getElementById('ReportViewerControl_ctl04_ctl03_ddValue');
     if (!periodSelect) {
         console.log('❌ Выпадающий список периода отчета не найден');
+        console.log('Проверьте ID элемента или дождитесь полной загрузки страницы');
+        console.log('Попробуйте подождать еще немного и запустить скрипт снова');
         return;
     }
 
@@ -65,6 +71,8 @@ try {
         console.log('   Заблокировано:', startDateField.disabled);
         console.log('   Класс:', startDateField.className);
         console.log('   Только чтение:', startDateField.readOnly);
+    } else {
+        console.log('❌ Поле "Дата начала" не найдено');
     }
 
     const endDateField = doc.getElementById('ReportViewerControl_ctl04_ctl07_txtValue');
@@ -74,6 +82,8 @@ try {
         console.log('   Заблокировано:', endDateField.disabled);
         console.log('   Класс:', endDateField.className);
         console.log('   Только чтение:', endDateField.readOnly);
+    } else {
+        console.log('❌ Поле "Дата окончания" не найдено');
     }
 
     const reasonField = doc.getElementById('ReportViewerControl_ctl04_ctl09_txtValue');
@@ -83,6 +93,8 @@ try {
         console.log('   Заблокировано:', reasonField.disabled);
         console.log('   Класс:', reasonField.className);
         console.log('   Только чтение:', reasonField.readOnly);
+    } else {
+        console.log('❌ Поле "Причина обращения" не найдено');
     }
 
     // Восстанавливаем исходное значение

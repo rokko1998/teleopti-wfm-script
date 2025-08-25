@@ -8,6 +8,8 @@ try {
     const iframe = document.querySelector('iframe.viewer') || document.querySelector('iframe');
     if (!iframe) {
         console.log('❌ Iframe не найден');
+        console.log('Проверьте, что страница полностью загружена');
+        console.log('Попробуйте подождать еще немного и запустить скрипт снова');
         return;
     }
 
@@ -16,6 +18,8 @@ try {
     const doc = iframe.contentDocument;
     if (!doc) {
         console.log('❌ Нет доступа к содержимому iframe');
+        console.log('Возможно, iframe еще не загружен или заблокирован CORS');
+        console.log('Попробуйте подождать еще немного и запустить скрипт снова');
         return;
     }
 
@@ -35,6 +39,8 @@ try {
         console.log('   Класс:', startDateField.className);
         console.log('   Readonly:', startDateField.readOnly);
         console.log('   Значение:', startDateField.value);
+    } else {
+        console.log('❌ Поле "Дата начала" не найдено');
     }
 
     if (endDateField) {
@@ -44,6 +50,8 @@ try {
         console.log('   Класс:', endDateField.className);
         console.log('   Readonly:', endDateField.readOnly);
         console.log('   Значение:', endDateField.value);
+    } else {
+        console.log('❌ Поле "Дата окончания" не найдено');
     }
 
     if (reasonField) {
@@ -53,6 +61,8 @@ try {
         console.log('   Класс:', reasonField.className);
         console.log('   Readonly:', reasonField.readOnly);
         console.log('   Значение:', reasonField.value);
+    } else {
+        console.log('❌ Поле "Причина обращения" не найдено');
     }
 
     // 2. Выбираем период "Произвольный"
@@ -61,6 +71,8 @@ try {
     const periodSelect = doc.getElementById('ReportViewerControl_ctl04_ctl03_ddValue');
     if (!periodSelect) {
         console.log('❌ Выпадающий список периода не найден');
+        console.log('Проверьте ID элемента или дождитесь полной загрузки страницы');
+        console.log('Попробуйте подождать еще немного и запустить скрипт снова');
         return;
     }
 
