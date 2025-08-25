@@ -99,8 +99,8 @@ def parse_arguments():
     parser.add_argument(
         '--wait-time',
         type=int,
-        default=10,
-        help='Время ожидания загрузки отчета в секундах (по умолчанию: 10)'
+        default=60,
+        help='Время ожидания загрузки отчета в секундах (по умолчанию: 60)'
     )
 
     return parser.parse_args()
@@ -230,7 +230,7 @@ def main():
                 start_date = end_date - timedelta(days=args.start_days_ago)
 
                 logger.info(f"📅 Период отчета: с {start_date.strftime('%d.%m.%Y')} по {end_date.strftime('%d.%m.%Y')}")
-                logger.info(f"📊 Тип периода: {args.period}")
+                logger.info(f"📊 Тип периода: произвольный (всегда)")
                 logger.info(f"🔍 Причина обращения: {args.reason}")
 
                 # Обрабатываем отчет
@@ -238,7 +238,7 @@ def main():
                     start_date=start_date,
                     end_date=end_date,
                     download_dir=str(download_dir),
-                    period=args.period,
+                    period='произвольный',  # Всегда используем "произвольный"
                     reason=args.reason  # Устанавливаем причину обращения
                 )
 

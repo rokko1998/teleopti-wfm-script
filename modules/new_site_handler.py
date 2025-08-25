@@ -33,19 +33,19 @@ class NewSiteReportHandler:
             'period_dropdown': 'ReportViewerControl_ctl04_ctl03_ddValue',
             'start_date_field': 'ReportViewerControl_ctl04_ctl05_txtValue',
             'end_date_field': 'ReportViewerControl_ctl04_ctl07_txtValue',
-            'reason_dropdown': 'ReportViewerControl_ctl04_ctl09_ddValue',  # Поле для причины обращения
+            'reason_dropdown': 'ReportViewerControl_ctl04_ctl09_txtValue',  # Поле для причины обращения
             'submit_button': 'ReportViewerControl_ctl04_ctl00',
             'excel_link': "//a[contains(text(), 'Excel') and contains(@class, 'ActiveLink')]"
         }
 
         # Значения для периода отчета
         self.PERIOD_VALUES = {
-            'произвольный': '900',
-            'день': '1',
-            'неделя': '7',
-            'месяц': '30',
-            '7_дней': '107',
-            'сегодня': '500'
+            'произвольный': 'Произвольный',
+            'день': 'Произвольный',
+            'неделя': 'Произвольный',
+            'месяц': 'Произвольный',
+            '7_дней': 'Произвольный',
+            'сегодня': 'Произвольный'
         }
 
         # Значения для причины обращения
@@ -55,6 +55,9 @@ class NewSiteReportHandler:
             '3g_4g': 'Низкая скорость в 3G/4G',
             'default': 'Низкая скорость в 3G/4G'
         }
+
+        # Флаг для работы с iframe
+        self.iframe_mode = True
 
     def fill_report_parameters(self, start_date, end_date, period='произвольный', reason='низкая_скорость_3g_4g'):
         """
@@ -72,12 +75,18 @@ class NewSiteReportHandler:
         try:
             self.logger.info("🔄 Начинаем заполнение параметров отчета...")
 
+            # Ждем 10 секунд после открытия страницы (она долго загружается)
+            self.logger.info("⏳ Ждем 10 секунд для полной загрузки страницы...")
+            import time
+            time.sleep(10)
+
             # 1. Устанавливаем "Период отчета"
             if not self._set_report_period(period):
                 return False
 
             # Ждем активации полей дат
-            time.sleep(2)
+            self.logger.info("⏳ Ждем активации полей дат...")
+            time.sleep(3)
 
             # 2. Устанавливаем "Дата начала"
             if not self._set_start_date(start_date):
@@ -106,6 +115,96 @@ class NewSiteReportHandler:
                 self.logger.error(f"❌ Неизвестный период: {period}")
                 return False
 
+            # Работаем с iframe если включен режим
+            if self.iframe_mode:
+                return self._set_report_period_in_iframe(period_value)
+            else:
+                return self._set_report_period_in_main_document(period_value)
+
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при установке периода отчета: {e}")
+            return False
+
+    def _set_report_period_in_iframe(self, period_value):
+        """Устанавливает период отчета в iframe'е."""
+        try:
+            # Ищем iframe
+            iframe = self.driver.find_element(By.TAG_NAME, "iframe")
+            if not iframe:
+                self.logger.error("❌ Iframe не найден")
+                return False
+
+            # Переключаемся на iframe
+            self.driver.switch_to.frame(iframe)
+            self.logger.info("✅ Переключились на iframe")
+
+            try:
+                # Ищем поле периода отчета
+                period_dropdown = WebDriverWait(self.driver, 10).until(
+                    EC.element_to_be_clickable((By.ID, self.ELEMENT_IDS['period_dropdown']))
+                )
+
+                # Проверяем, заблокировано ли поле
+                if 'aspNetDisabled' in period_dropdown.get_attribute('class') or 'disabled' in period_dropdown.get_attribute('class'):
+                    self.logger.info("🔓 Поле 'Период отчета' заблокировано, пытаемся разблокировать...")
+
+                    # Пытаемся разблокировать поле
+                    self.driver.execute_script("arguments[0].removeAttribute('disabled');", period_dropdown)
+                    self.driver.execute_script("arguments[0].classList.remove('aspNetDisabled');", period_dropdown)
+                    self.driver.execute_script("arguments[0].classList.remove('DisabledTextBox');", period_dropdown)
+
+                    # Ждем немного
+                    time.sleep(1)
+
+                    # Проверяем, разблокировалось ли поле
+                    if 'aspNetDisabled' not in period_dropdown.get_attribute('class'):
+                        self.logger.info("✅ Поле 'Период отчета' разблокировано")
+                    else:
+                        self.logger.warning("⚠️ Не удалось разблокировать поле 'Период отчета'")
+
+                # Устанавливаем значение
+                period_select = Select(period_dropdown)
+
+                # Пробуем найти опцию по тексту
+                try:
+                    period_select.select_by_visible_text(period_value)
+                    self.logger.info(f"✅ Период отчета установлен: {period_value}")
+                except:
+                    # Если не получилось, пробуем найти по частичному совпадению
+                    options = period_select.options
+                    for option in options:
+                        if period_value.lower() in option.text.lower():
+                            period_select.select_by_visible_text(option.text)
+                            self.logger.info(f"✅ Период отчета установлен: {option.text}")
+                            break
+                    else:
+                        # Если ничего не нашли, выбираем первую опцию
+                        period_select.select_by_index(0)
+                        self.logger.warning(f"⚠️ Не удалось найти точное совпадение, выбрана первая опция: {period_select.first_selected_option.text}")
+
+                # Ждем разблокировки других полей
+                self.logger.info("⏳ Ждем разблокировки полей дат...")
+                time.sleep(3)
+
+                return True
+
+            finally:
+                # Возвращаемся в основной документ
+                self.driver.switch_to.default_content()
+                self.logger.info("✅ Вернулись в основной документ")
+
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при установке периода отчета в iframe: {e}")
+            # Возвращаемся в основной документ в случае ошибки
+            try:
+                self.driver.switch_to.default_content()
+            except:
+                pass
+            return False
+
+    def _set_report_period_in_main_document(self, period_value):
+        """Устанавливает период отчета в основном документе (старый метод)."""
+        try:
             # Пробуем найти элемент по ID
             try:
                 period_dropdown = WebDriverWait(self.driver, 10).until(
@@ -128,7 +227,7 @@ class NewSiteReportHandler:
             period_select = Select(period_dropdown)
             period_select.select_by_value(period_value)
 
-            self.logger.info(f"✅ Период отчета установлен: {period}")
+            self.logger.info(f"✅ Период отчета установлен: {period_value}")
             return True
 
         except Exception as e:
@@ -137,6 +236,64 @@ class NewSiteReportHandler:
 
     def _set_start_date(self, start_date):
         """Устанавливает дату начала."""
+        try:
+            # Работаем с iframe если включен режим
+            if self.iframe_mode:
+                return self._set_start_date_in_iframe(start_date)
+            else:
+                return self._set_start_date_in_main_document(start_date)
+
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при установке даты начала: {e}")
+            return False
+
+    def _set_start_date_in_iframe(self, start_date):
+        """Устанавливает дату начала в iframe'е."""
+        try:
+            # Ищем iframe
+            iframe = self.driver.find_element(By.TAG_NAME, "iframe")
+            if not iframe:
+                self.logger.error("❌ Iframe не найден")
+                return False
+
+            # Переключаемся на iframe
+            self.driver.switch_to.frame(iframe)
+            self.logger.info("✅ Переключились на iframe для установки даты начала")
+
+            try:
+                # Ищем поле даты начала
+                start_date_field = WebDriverWait(self.driver, 10).until(
+                    EC.element_to_be_clickable((By.ID, self.ELEMENT_IDS['start_date_field']))
+                )
+
+                # Проверяем, заблокировано ли поле
+                if 'aspNetDisabled' in start_date_field.get_attribute('class') or 'disabled' in start_date_field.get_attribute('class'):
+                    self.logger.warning("⚠️ Поле 'Дата начала' все еще заблокировано. Возможно, нужно сначала выбрать период отчета.")
+                    return False
+
+                # Устанавливаем дату
+                start_date_field.clear()
+                start_date_field.send_keys(start_date.strftime("%d.%m.%Y"))
+
+                self.logger.info(f"✅ Дата начала установлена: {start_date.strftime('%d.%m.%Y')}")
+                return True
+
+            finally:
+                # Возвращаемся в основной документ
+                self.driver.switch_to.default_content()
+                self.logger.info("✅ Вернулись в основной документ")
+
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при установке даты начала в iframe: {e}")
+            # Возвращаемся в основной документ в случае ошибки
+            try:
+                self.driver.switch_to.default_content()
+            except:
+                pass
+            return False
+
+    def _set_start_date_in_main_document(self, start_date):
+        """Устанавливает дату начала в основном документе (старый метод)."""
         try:
             # Пробуем найти элемент по ID
             try:
@@ -170,6 +327,64 @@ class NewSiteReportHandler:
     def _set_end_date(self, end_date):
         """Устанавливает дату окончания."""
         try:
+            # Работаем с iframe если включен режим
+            if self.iframe_mode:
+                return self._set_end_date_in_iframe(end_date)
+            else:
+                return self._set_end_date_in_main_document(end_date)
+
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при установке даты окончания: {e}")
+            return False
+
+    def _set_end_date_in_iframe(self, end_date):
+        """Устанавливает дату окончания в iframe'е."""
+        try:
+            # Ищем iframe
+            iframe = self.driver.find_element(By.TAG_NAME, "iframe")
+            if not iframe:
+                self.logger.error("❌ Iframe не найден")
+                return False
+
+            # Переключаемся на iframe
+            self.driver.switch_to.frame(iframe)
+            self.logger.info("✅ Переключились на iframe для установки даты окончания")
+
+            try:
+                # Ищем поле даты окончания
+                end_date_field = WebDriverWait(self.driver, 10).until(
+                    EC.element_to_be_clickable((By.ID, self.ELEMENT_IDS['end_date_field']))
+                )
+
+                # Проверяем, заблокировано ли поле
+                if 'aspNetDisabled' in end_date_field.get_attribute('class') or 'disabled' in end_date_field.get_attribute('class'):
+                    self.logger.warning("⚠️ Поле 'Дата окончания' все еще заблокировано. Возможно, нужно сначала выбрать период отчета.")
+                    return False
+
+                # Устанавливаем дату
+                end_date_field.clear()
+                end_date_field.send_keys(end_date.strftime("%d.%m.%Y"))
+
+                self.logger.info(f"✅ Дата окончания установлена: {end_date.strftime('%d.%m.%Y')}")
+                return True
+
+            finally:
+                # Возвращаемся в основной документ
+                self.driver.switch_to.default_content()
+                self.logger.info("✅ Вернулись в основной документ")
+
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при установке даты окончания в iframe: {e}")
+            # Возвращаемся в основной документ в случае ошибки
+            try:
+                self.driver.switch_to.default_content()
+            except:
+                pass
+            return False
+
+    def _set_end_date_in_main_document(self, end_date):
+        """Устанавливает дату окончания в основном документе (старый метод)."""
+        try:
             # Пробуем найти элемент по ID
             try:
                 end_date_field = WebDriverWait(self.driver, 10).until(
@@ -201,6 +416,64 @@ class NewSiteReportHandler:
 
     def _set_reason(self, reason):
         """Устанавливает причину обращения."""
+        try:
+            # Работаем с iframe если включен режим
+            if self.iframe_mode:
+                return self._set_reason_in_iframe(reason)
+            else:
+                return self._set_reason_in_main_document(reason)
+
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при установке причины обращения: {e}")
+            return False
+
+    def _set_reason_in_iframe(self, reason):
+        """Устанавливает причину обращения в iframe'е."""
+        try:
+            # Ищем iframe
+            iframe = self.driver.find_element(By.TAG_NAME, "iframe")
+            if not iframe:
+                self.logger.error("❌ Iframe не найден")
+                return False
+
+            # Переключаемся на iframe
+            self.driver.switch_to.frame(iframe)
+            self.logger.info("✅ Переключились на iframe для установки причины обращения")
+
+            try:
+                # Ищем поле причины обращения
+                reason_field = WebDriverWait(self.driver, 10).until(
+                    EC.element_to_be_clickable((By.ID, self.ELEMENT_IDS['reason_dropdown']))
+                )
+
+                # Проверяем, заблокировано ли поле
+                if 'aspNetDisabled' in reason_field.get_attribute('class') or 'disabled' in reason_field.get_attribute('class'):
+                    self.logger.warning("⚠️ Поле 'Причина обращения' все еще заблокировано. Возможно, нужно сначала выбрать период отчета.")
+                    return False
+
+                # Устанавливаем причину обращения
+                reason_field.clear()
+                reason_field.send_keys(self.REASON_VALUES.get(reason.lower(), self.REASON_VALUES['default']))
+
+                self.logger.info(f"✅ Причина обращения установлена: {self.REASON_VALUES.get(reason.lower(), self.REASON_VALUES['default'])}")
+                return True
+
+            finally:
+                # Возвращаемся в основной документ
+                self.driver.switch_to.default_content()
+                self.logger.info("✅ Вернулись в основной документ")
+
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при установке причины обращения в iframe: {e}")
+            # Возвращаемся в основной документ в случае ошибки
+            try:
+                self.driver.switch_to.default_content()
+            except:
+                pass
+            return False
+
+    def _set_reason_in_main_document(self, reason):
+        """Устанавливает причину обращения в основном документе (старый метод)."""
         try:
             reason_value = self.REASON_VALUES.get(reason.lower(), self.REASON_VALUES['default'])
 
@@ -369,6 +642,69 @@ class NewSiteReportHandler:
         try:
             self.logger.info("🔄 Отправляем запрос на формирование отчета...")
 
+            # Работаем с iframe если включен режим
+            if self.iframe_mode:
+                return self._submit_report_request_in_iframe(wait_time)
+            else:
+                return self._submit_report_request_in_main_document(wait_time)
+
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при отправке запроса: {e}")
+            return False
+
+    def _submit_report_request_in_iframe(self, wait_time):
+        """Отправляет запрос на формирование отчета в iframe'е."""
+        try:
+            # Ищем iframe
+            iframe = self.driver.find_element(By.TAG_NAME, "iframe")
+            if not iframe:
+                self.logger.error("❌ Iframe не найден")
+                return False
+
+            # Переключаемся на iframe
+            self.driver.switch_to.frame(iframe)
+            self.logger.info("✅ Переключились на iframe для отправки отчета")
+
+            try:
+                # Ищем кнопку отправки
+                submit_button = WebDriverWait(self.driver, 10).until(
+                    EC.element_to_be_clickable((By.ID, self.ELEMENT_IDS['submit_button']))
+                )
+
+                # Проверяем, готова ли кнопка
+                if not self._wait_for_element_ready(submit_button):
+                    self.logger.error("❌ Кнопка отправки не готова к взаимодействию")
+                    return False
+
+                # Кликаем по кнопке
+                submit_button.click()
+                self.logger.info("✅ Запрос на формирование отчета отправлен")
+
+                # Ждем загрузки отчета с периодической проверкой
+                self.logger.info("⏳ Ожидание загрузки отчета...")
+                if not self._wait_for_report_loaded(wait_time):
+                    self.logger.error("❌ Таймаут ожидания загрузки отчета")
+                    return False
+
+                return True
+
+            finally:
+                # Возвращаемся в основной документ
+                self.driver.switch_to.default_content()
+                self.logger.info("✅ Вернулись в основной документ")
+
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при отправке запроса в iframe: {e}")
+            # Возвращаемся в основной документ в случае ошибки
+            try:
+                self.driver.switch_to.default_content()
+            except:
+                pass
+            return False
+
+    def _submit_report_request_in_main_document(self, wait_time):
+        """Отправляет запрос на формирование отчета в основном документе (старый метод)."""
+        try:
             # Пробуем найти кнопку по ID
             try:
                 submit_button = WebDriverWait(self.driver, 10).until(
@@ -423,20 +759,127 @@ class NewSiteReportHandler:
         try:
             self.logger.info("🔄 Начинаем экспорт в Excel...")
 
-            # Ищем Excel кнопку
-            excel_link = WebDriverWait(self.driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, self.ELEMENT_IDS['excel_link']))
-            )
+            # Кнопка сохранения находится вне iframe'а, ищем в основном документе
+            self.logger.info("🔍 Ищем кнопку сохранения в основном документе...")
 
-            self.logger.info("✅ Excel кнопка найдена")
+            # Ищем кнопку сохранения/экспорта
+            save_button_selectors = [
+                "//*[contains(text(), 'Сохранить')]",
+                "//*[contains(text(), 'Save')]",
+                "//*[contains(text(), 'Экспорт')]",
+                "//*[contains(text(), 'Export')]",
+                "//*[contains(text(), 'Excel')]",
+                "//button[contains(text(), 'Сохранить')]",
+                "//button[contains(text(), 'Save')]",
+                "//a[contains(text(), 'Сохранить')]",
+                "//a[contains(text(), 'Save')]",
+                "//input[contains(@value, 'Сохранить')]",
+                "//input[contains(@value, 'Save')]"
+            ]
 
-            # Кликаем по Excel
-            excel_link.click()
-            self.logger.info("✅ Клик по Excel выполнен")
+            save_button = None
+            for selector in save_button_selectors:
+                try:
+                    elements = self.driver.find_elements(By.XPATH, selector)
+                    if elements:
+                        save_button = elements[0]
+                        self.logger.info(f"✅ Кнопка сохранения найдена по селектору: {selector}")
+                        break
+                except:
+                    continue
+
+            if not save_button:
+                self.logger.error("❌ Кнопка сохранения не найдена")
+                return False
+
+            # Кликаем по кнопке сохранения
+            self.logger.info("🖱️ Кликаем по кнопке сохранения...")
+            save_button.click()
+
+            # Ждем появления выпадающего списка
+            self.logger.info("⏳ Ждем появления выпадающего списка...")
+            time.sleep(2)
+
+            # Ищем выпадающий список с опциями сохранения
+            dropdown_selectors = [
+                "//select[contains(@id, 'format') or contains(@id, 'Format')]",
+                "//select[contains(@name, 'format') or contains(@name, 'Format')]",
+                "//select[contains(@class, 'format') or contains(@class, 'Format')]",
+                "//div[contains(@class, 'dropdown')]//select",
+                "//div[contains(@class, 'menu')]//select",
+                "//ul[contains(@class, 'dropdown')]//select",
+                "//ul[contains(@class, 'menu')]//select"
+            ]
+
+            format_dropdown = None
+            for selector in dropdown_selectors:
+                try:
+                    elements = self.driver.find_elements(By.XPATH, selector)
+                    if elements:
+                        format_dropdown = elements[0]
+                        self.logger.info(f"✅ Выпадающий список форматов найден по селектору: {selector}")
+                        break
+                except:
+                    continue
+
+            if format_dropdown:
+                # Выбираем Excel из выпадающего списка
+                try:
+                    format_select = Select(format_dropdown)
+
+                    # Ищем опцию Excel
+                    excel_options = []
+                    for option in format_select.options:
+                        if 'excel' in option.text.lower() or 'xlsx' in option.text.lower() or 'xls' in option.text.lower():
+                            excel_options.append(option)
+
+                    if excel_options:
+                        # Выбираем первую найденную опцию Excel
+                        format_select.select_by_visible_text(excel_options[0].text)
+                        self.logger.info(f"✅ Выбран формат: {excel_options[0].text}")
+                    else:
+                        # Если не нашли Excel, выбираем первую опцию
+                        format_select.select_by_index(0)
+                        self.logger.warning(f"⚠️ Excel не найден, выбрана первая опция: {format_select.first_selected_option.text}")
+
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Не удалось выбрать формат из выпадающего списка: {e}")
+
+            # Ищем кнопку подтверждения сохранения
+            confirm_selectors = [
+                "//*[contains(text(), 'ОК')]",
+                "//*[contains(text(), 'OK')]",
+                "//*[contains(text(), 'Подтвердить')]",
+                "//*[contains(text(), 'Confirm')]",
+                "//*[contains(text(), 'Сохранить')]",
+                "//*[contains(text(), 'Save')]",
+                "//button[contains(text(), 'ОК')]",
+                "//button[contains(text(), 'OK')]",
+                "//input[contains(@value, 'ОК')]",
+                "//input[contains(@value, 'OK')]"
+            ]
+
+            confirm_button = None
+            for selector in confirm_selectors:
+                try:
+                    elements = self.driver.find_elements(By.XPATH, selector)
+                    if elements:
+                        confirm_button = elements[0]
+                        self.logger.info(f"✅ Кнопка подтверждения найдена по селектору: {selector}")
+                        break
+                except:
+                    continue
+
+            if confirm_button:
+                # Кликаем по кнопке подтверждения
+                self.logger.info("🖱️ Кликаем по кнопке подтверждения...")
+                confirm_button.click()
+                self.logger.info("✅ Экспорт в Excel инициирован")
+            else:
+                self.logger.info("ℹ️ Кнопка подтверждения не найдена, возможно сохранение началось автоматически")
 
             # Ждем начала загрузки
             time.sleep(3)
-
             return True
 
         except Exception as e:
