@@ -97,10 +97,19 @@ class FormFiller:
                 self.driver.execute_script("arguments[0].value = arguments[1];", start_date_field, start_date)
                 
                 # Триггерим событие onchange для активации JavaScript обработчиков
+                self.logger.info("🔄 Триггерим onchange событие...")
                 self.driver.execute_script("arguments[0].onchange();", start_date_field)
                 
-                # Ждем немного для применения изменений
-                time.sleep(1)
+                # Ждем завершения postback (ASP.NET WebForms)
+                self.logger.info("⏳ Ждем завершения postback...")
+                time.sleep(3)
+                
+                # После postback ищем элемент заново (избегаем stale element reference)
+                self.logger.info("🔍 Ищем элемент даты начала заново после postback...")
+                start_date_field = self.iframe_handler.find_element_in_iframe(start_date_selector)
+                if not start_date_field:
+                    self.logger.error("❌ Элемент даты начала не найден после postback")
+                    return False
                 
                 # Проверяем, что значение установилось
                 actual_value = start_date_field.get_attribute('value')
@@ -150,10 +159,19 @@ class FormFiller:
                 self.driver.execute_script("arguments[0].value = arguments[1];", end_date_field, end_date)
                 
                 # Триггерим событие onchange для активации JavaScript обработчиков
+                self.logger.info("🔄 Триггерим onchange событие...")
                 self.driver.execute_script("arguments[0].onchange();", end_date_field)
                 
-                # Ждем немного для применения изменений
-                time.sleep(1)
+                # Ждем завершения postback (ASP.NET WebForms)
+                self.logger.info("⏳ Ждем завершения postback...")
+                time.sleep(3)
+                
+                # После postback ищем элемент заново (избегаем stale element reference)
+                self.logger.info("🔍 Ищем элемент даты окончания заново после postback...")
+                end_date_field = self.iframe_handler.find_element_in_iframe(end_date_selector)
+                if not end_date_field:
+                    self.logger.error("❌ Элемент даты окончания не найден после postback")
+                    return False
                 
                 # Проверяем, что значение установилось
                 actual_value = end_date_field.get_attribute('value')
