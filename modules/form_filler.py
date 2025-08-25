@@ -8,13 +8,13 @@ from loguru import logger
 
 class FormFiller:
     """Класс для заполнения формы отчета"""
-    
+
     def __init__(self, driver, iframe_handler, form_elements, logger_instance=None):
         self.driver = driver
         self.iframe_handler = iframe_handler
         self.form_elements = form_elements
         self.logger = logger_instance or logger
-    
+
     def set_report_period(self, period_name='произвольный'):
         """Установить период отчета"""
         try:
