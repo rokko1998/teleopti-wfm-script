@@ -153,33 +153,22 @@ class FormFiller:
 
                 # Получаем тестовую дату
                 end_date = self.form_elements.get_test_date('end_date')
-
+                
                 # Используем JavaScript для установки значения (поле имеет кастомные обработчики)
                 self.logger.info(f"📝 Устанавливаем дату через JavaScript: {end_date}")
                 self.driver.execute_script("arguments[0].value = arguments[1];", end_date_field, end_date)
-
-                # Триггерим событие onchange для активации JavaScript обработчиков
-                self.logger.info("🔄 Триггерим onchange событие...")
-                self.driver.execute_script("arguments[0].onchange();", end_date_field)
-
-                # Ждем завершения postback (ASP.NET WebForms)
-                self.logger.info("⏳ Ждем завершения postback...")
-                time.sleep(3)
-
-                # После postback ищем элемент заново (избегаем stale element reference)
-                self.logger.info("🔍 Ищем элемент даты окончания заново после postback...")
-                end_date_field = self.iframe_handler.find_element_in_iframe(end_date_selector)
-                if not end_date_field:
-                    self.logger.error("❌ Элемент даты окончания не найден после postback")
-                    return False
-
+                
+                # У поля даты окончания нет onchange обработчика, просто ждем
+                self.logger.info("⏳ Ждем применения изменений...")
+                time.sleep(2)
+                
                 # Проверяем, что значение установилось
                 actual_value = end_date_field.get_attribute('value')
                 if end_date in actual_value:
                     self.logger.info(f"✅ Дата окончания установлена: {end_date}")
                 else:
                     self.logger.warning(f"⚠️ Дата установлена, но значение отличается: {actual_value}")
-
+                
                 return True
 
             finally:
@@ -199,74 +188,74 @@ class FormFiller:
         """Установить причину обращения через выпадающий список с чекбоксами"""
         try:
             self.logger.info("🔍 Устанавливаем причину обращения")
-            
+
             # Переключаемся на iframe
             if not self.iframe_handler.switch_to_iframe():
                 return False
-            
+
             try:
                 # 1. Сначала нажимаем на кнопку выпадающего списка
                 dropdown_toggle_selector = self.form_elements.get_dropdown_selector('reason_dropdown_toggle')
                 if not dropdown_toggle_selector:
                     self.logger.error("❌ Селектор кнопки выпадающего списка не найден")
                     return False
-                
+
                 dropdown_toggle = self.iframe_handler.find_element_in_iframe(dropdown_toggle_selector)
                 if not dropdown_toggle:
                     self.logger.error("❌ Кнопка выпадающего списка не найдена")
                     return False
-                
+
                 self.logger.info("📋 Открываем выпадающий список причины обращения...")
                 dropdown_toggle.click()
-                
+
                 # Ждем появления выпадающего списка
                 time.sleep(2)
-                
+
                 # 2. Теперь нажимаем "Выделить все" чтобы снять все галочки
                 select_all_selector = self.form_elements.get_dropdown_selector('reason_select_all')
                 if not select_all_selector:
                     self.logger.error("❌ Селектор 'Выделить все' не найден")
                     return False
-                
+
                 select_all_checkbox = self.iframe_handler.find_element_in_iframe(select_all_selector)
                 if not select_all_checkbox:
                     self.logger.error("❌ Чекбокс 'Выделить все' не найден")
                     return False
-                
+
                 self.logger.info("🗑️ Снимаем все галочки через 'Выделить все'...")
                 select_all_checkbox.click()
-                
+
                 # Ждем применения изменений
                 time.sleep(1)
-                
+
                 # 3. Теперь выбираем нужный чекбокс
                 checkbox_selector = self.form_elements.get_dropdown_selector('reason_checkbox')
                 if not checkbox_selector:
                     self.logger.error("❌ Селектор чекбокса не найден")
                     return False
-                
+
                 checkbox = self.iframe_handler.find_element_in_iframe(checkbox_selector)
                 if not checkbox:
                     self.logger.error("❌ Чекбокс 'Низкая скорость в 3G/4G' не найден")
                     return False
-                
+
                 # Проверяем, не выбран ли уже чекбокс
                 if not checkbox.is_selected():
                     self.logger.info("✅ Выбираем чекбокс 'Низкая скорость в 3G/4G'...")
                     checkbox.click()
                 else:
                     self.logger.info("✅ Чекбокс 'Низкая скорость в 3G/4G' уже выбран")
-                
+
                 # Ждем применения выбора
                 time.sleep(1)
-                
+
                 self.logger.info("✅ Причина обращения установлена: Низкая скорость в 3G/4G")
                 return True
-                
+
             finally:
                 # Возвращаемся в основной документ
                 self.iframe_handler.switch_to_main_document()
-                
+
         except Exception as e:
             self.logger.error(f"❌ Ошибка при установке причины обращения: {e}")
             # Возвращаемся в основной документ в случае ошибки
