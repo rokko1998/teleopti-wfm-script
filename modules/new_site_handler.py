@@ -32,40 +32,40 @@ class NewSiteHandler:
         """Обработать отчет - основная логика"""
         try:
             self.logger.info("[new_site_handler] 📊 Начинаем обработку отчета...")
-            
+
             # 1. Устанавливаем период отчета
             if not self.form_filler.set_report_period():
                 self.logger.error("[new_site_handler] ❌ Не удалось установить период отчета")
                 return False
-            
+
             # 2. Устанавливаем дату начала
             if not self.form_filler.set_start_date():
                 self.logger.error("[new_site_handler] ❌ Не удалось установить дату начала")
                 return False
-            
+
             # 3. Устанавливаем дату окончания
             if not self.form_filler.set_end_date():
                 self.logger.error("[new_site_handler] ❌ Не удалось установить дату окончания")
                 return False
-            
+
             # 4. Устанавливаем причину обращения
             if not self.form_filler.set_reason():
                 self.logger.error("[new_site_handler] ❌ Не удалось установить причину обращения")
                 return False
-            
+
             # 5. Отправляем запрос на формирование отчета
             if not self.form_filler.submit_report():
                 self.logger.error("[new_site_handler] ❌ Не удалось отправить запрос на формирование отчета")
                 return False
-            
+
             # 6. Экспортируем в Excel
             if not self.excel_exporter.export_to_excel():
                 self.logger.error("[new_site_handler] ❌ Не удалось экспортировать отчет в Excel")
                 return False
-            
+
             self.logger.info("[new_site_handler] ✅ Отчет успешно обработан и экспортирован в Excel")
             return True
-            
+
         except Exception as e:
             self.logger.error(f"[new_site_handler] ❌ Критическая ошибка при обработке отчета: {e}")
             return False
