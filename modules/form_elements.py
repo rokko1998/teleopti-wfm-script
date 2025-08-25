@@ -15,14 +15,11 @@ class FormElements:
         'submit_button': '#ReportViewerControl_ctl04_ctl00',                     # Кнопка отправки (INPUT)
     }
 
-    # Селекторы для сложного поля "Причина обращения" (multi-select/checkbox)
+    # Селекторы для выпадающих списков и чекбоксов
     DROPDOWN_SELECTORS = {
-        'dropdown_toggle': "div[id*='divDropD']",  # Кнопка открытия выпадающего списка
-        'select_all_checkbox': "input[id*='chkSelectAll']",  # Чекбокс "Выделить все"
-        'reason_checkbox': "input[id*='chk'][checked='checked']",  # Конкретный чекбокс причины
-        'reason_label': "label[for*='ReportViewer'][for*='chk']",  # Лейбл для чекбокса
-        'specific_reason': "input[id*='chk'][id*='ctl04'][id*='ctl123']",  # Конкретный чекбокс по ID
-        'reason_text': "label:contains('Интернет >> Низкая скорость в 3G/4G')"  # Текст причины
+        'reason_dropdown_toggle': '#ReportViewerControl_ctl04_ctl23_ddDropDownButton',  # Кнопка выпадающего списка причины
+        'reason_select_all': '#ReportViewerControl_ctl04_ctl23_divDropDown_ctl00',      # Чекбокс "Выделить все" (снять все галочки)
+        'reason_checkbox': '#ReportViewerControl_ctl04_ctl23_divDropDown_ctl372',       # Чекбокс "Низкая скорость в 3G/4G"
     }
 
     # Значения для периода отчета
@@ -39,10 +36,9 @@ class FormElements:
     # Значение для причины обращения
     REASON_VALUE = 'Низкая скорость в 3G/4G'
 
-    @classmethod
-    def get_element_selector(cls, element_name):
-        """Получить CSS селектор для элемента по имени"""
-        return cls.ELEMENT_SELECTORS.get(element_name)
+    def get_element_selector(self, element_name):
+        """Получить селектор элемента по имени"""
+        return self.ELEMENT_SELECTORS.get(element_name)
 
     @classmethod
     def get_period_value(cls, period_name):
@@ -54,7 +50,6 @@ class FormElements:
         """Получить тестовую дату по типу"""
         return cls.TEST_DATES.get(date_type)
 
-    @classmethod
-    def get_dropdown_selector(cls, dropdown_name):
-        """Получить CSS селектор для выпадающего списка по имени"""
-        return cls.DROPDOWN_SELECTORS.get(dropdown_name)
+    def get_dropdown_selector(self, selector_name):
+        """Получить селектор выпадающего списка по имени"""
+        return self.DROPDOWN_SELECTORS.get(selector_name)
