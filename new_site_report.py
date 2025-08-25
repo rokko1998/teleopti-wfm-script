@@ -13,7 +13,7 @@ from pathlib import Path
 
 # Импортируем наши модули
 from modules.selenium_helpers import get_driver, apply_cdp_download_settings, setup_proxy
-from modules.new_site_handler import NewSiteReportHandler
+from modules.new_site_handler import NewSiteHandler
 
 
 # Константы
@@ -181,7 +181,7 @@ def main():
                 logger.info("📊 Начинаем обработку отчета...")
 
                 # Создаем обработчик отчетов
-                report_handler = NewSiteReportHandler(driver, logger)
+                report_handler = NewSiteHandler(driver, logger)
 
                 # Используем фиксированные тестовые даты
                 start_date = datetime.strptime('01.08.2025', '%d.%m.%Y')
