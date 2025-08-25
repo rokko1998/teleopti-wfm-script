@@ -5,14 +5,14 @@ python new_site_report.py — Основной скрипт для выгруз�
 """
 
 import sys
-import time
 import argparse
+import logging
+import time
+from datetime import datetime, timedelta
 from pathlib import Path
-from datetime import datetime
-from loguru import logger
 
-# Импорты из наших модулей
-from modules.selenium_helpers import get_driver, setup_proxy, apply_cdp_download_settings
+# Импортируем наши модули
+from modules.selenium_helpers import get_driver, apply_cdp_download_settings, setup_proxy
 from modules.new_site_handler import NewSiteHandler
 
 
@@ -25,35 +25,22 @@ NEW_SITE_URL = (
 DEFAULT_DOWNLOAD_DIR = str(Path.home() / "Downloads")
 
 
-def setup_logging(level="INFO"):
+def setup_logging(level=logging.INFO):
     """
-    Настраивает логирование с помощью loguru.
+    Настраивает логирование.
 
     Args:
         level: Уровень логирования
     """
-    # Убираем стандартный handler
-    logger.remove()
-    
-    # Добавляем красивый вывод в консоль
-    logger.add(
-        sys.stderr,
-        format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> - <level>{level}</level> - <cyan>{name}</cyan> - <level>{message}</level>",
+    logging.basicConfig(
         level=level,
-        colorize=True
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler('new_site_report.log', encoding='utf-8')
+        ]
     )
-    
-    # Добавляем вывод в файл
-    logger.add(
-        "new_site_report.log",
-        format="{time:YYYY-MM-DD HH:mm:ss} - {level} - {name} - {message}",
-        level=level,
-        encoding="utf-8",
-        rotation="1 day",
-        retention="7 days"
-    )
-    
-    return logger
+    return logging.getLogger(__name__)
 
 
 def parse_arguments():
@@ -159,7 +146,7 @@ def main():
     args = parse_arguments()
 
     # Настраиваем логирование
-    setup_logging()
+    logger = setup_logging()
     logger.info("🚀 Запуск скрипта для работы с новым сайтом отчетов")
 
     # Проверяем директорию для загрузки
@@ -205,7 +192,7 @@ def main():
                 logger.info(f"🔍 Причина обращения: {args.reason}")
 
                 # Обрабатываем отчет
-                success = report_handler.process_report()
+                success = report_handler.process_report(wait_time=args.wait_time)
 
                 if success:
                     logger.info("🎉 Отчет успешно обработан и экспортирован в Excel")

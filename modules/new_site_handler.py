@@ -28,46 +28,50 @@ class NewSiteHandler:
         self.form_filler = FormFiller(driver, logger, self.iframe_handler, self.form_elements)
         self.excel_exporter = ExcelExporter(driver, logger)
 
-    def process_report(self):
-        """Обработать отчет - основная логика"""
+    def process_report(self, wait_time=60):
+        """Основной метод для обработки отчета"""
         try:
-            self.logger.info("[new_site_handler] 📊 Начинаем обработку отчета...")
+            self.logger.info("🚀 Начинаем обработку отчета на новом сайте...")
+
+            # Ждем загрузки страницы
+            self.logger.info("⏳ Ждем загрузки страницы...")
+            time.sleep(10)
 
             # 1. Устанавливаем период отчета
-            if not self.form_filler.set_report_period():
-                self.logger.error("[new_site_handler] ❌ Не удалось установить период отчета")
+            if not self.form_filler.set_report_period('произвольный'):
+                self.logger.error("❌ Не удалось установить период отчета")
                 return False
 
             # 2. Устанавливаем дату начала
             if not self.form_filler.set_start_date():
-                self.logger.error("[new_site_handler] ❌ Не удалось установить дату начала")
+                self.logger.error("❌ Не удалось установить дату начала")
                 return False
 
             # 3. Устанавливаем дату окончания
             if not self.form_filler.set_end_date():
-                self.logger.error("[new_site_handler] ❌ Не удалось установить дату окончания")
+                self.logger.error("❌ Не удалось установить дату окончания")
                 return False
 
             # 4. Устанавливаем причину обращения
             if not self.form_filler.set_reason():
-                self.logger.error("[new_site_handler] ❌ Не удалось установить причину обращения")
+                self.logger.error("❌ Не удалось установить причину обращения")
                 return False
 
-            # 5. Отправляем запрос на формирование отчета
+            # 5. Отправляем отчет
             if not self.form_filler.submit_report():
-                self.logger.error("[new_site_handler] ❌ Не удалось отправить запрос на формирование отчета")
+                self.logger.error("❌ Не удалось отправить отчет")
                 return False
 
             # 6. Экспортируем в Excel
-            if not self.excel_exporter.export_to_excel():
-                self.logger.error("[new_site_handler] ❌ Не удалось экспортировать отчет в Excel")
+            if not self.excel_exporter.export_to_excel(wait_time=wait_time):
+                self.logger.error("❌ Не удалось экспортировать в Excel")
                 return False
 
-            self.logger.info("[new_site_handler] ✅ Отчет успешно обработан и экспортирован в Excel")
+            self.logger.info("🎉 Обработка отчета завершена успешно!")
             return True
 
         except Exception as e:
-            self.logger.error(f"[new_site_handler] ❌ Критическая ошибка при обработке отчета: {e}")
+            self.logger.error(f"❌ Критическая ошибка при обработке отчета: {e}")
             return False
 
     def fill_report_parameters(self):
