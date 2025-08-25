@@ -9,10 +9,16 @@ class FormElements:
     # Элементы формы по ID (точный поиск на основе диагностики)
     ELEMENT_SELECTORS = {
         'period_dropdown': '#ReportViewerControl_ctl04_ctl03_ddValue',           # Период отчета (SELECT)
-        'start_date_field': '#ReportViewerControl_ctl04_ctl05_txtValue',         # Дата начала (INPUT)
-        'end_date_field': '#ReportViewerControl_ctl04_ctl07_txtValue',           # Дата окончания (INPUT)
-        'reason_field': '#ReportViewerControl_ctl04_ctl09_txtValue',             # Причина обращения (INPUT)
+        'start_date_field': 'input[name="ReportViewerControl$ctl04$ctl05$txtValue"]',  # Дата начала (INPUT)
+        'end_date_field': 'input[name="ReportViewerControl$ctl04$ctl09$txtValue"]',    # Дата окончания (INPUT)
+        'reason_field': 'input[name="ReportViewerControl$ctl04$ctl23$txtValue"]',       # Причина обращения (INPUT)
         'submit_button': '#ReportViewerControl_ctl04_ctl00',                     # Кнопка отправки (INPUT)
+    }
+    
+    # Селекторы для выпадающих списков и чекбоксов
+    DROPDOWN_SELECTORS = {
+        'reason_dropdown_toggle': '#ReportViewerControl_ctl04_ctl23_divDropDown_ctl00',  # Кнопка выпадающего списка причины
+        'reason_checkbox': '#ReportViewerControl_ctl04_ctl23_divDropDown_ctl372',        # Чекбокс "Низкая скорость в 3G/4G"
     }
 
     # Значения для периода отчета
@@ -43,3 +49,8 @@ class FormElements:
     def get_test_date(cls, date_type):
         """Получить тестовую дату по типу"""
         return cls.TEST_DATES.get(date_type)
+    
+    @classmethod
+    def get_dropdown_selector(cls, dropdown_name):
+        """Получить CSS селектор для выпадающего списка по имени"""
+        return cls.DROPDOWN_SELECTORS.get(dropdown_name)

@@ -33,14 +33,14 @@ class FormFiller:
                 if not period_field:
                     self.logger.error("❌ Поле периода отчета не найдено")
                     return False
-                
+
                 # Проверяем, что это SELECT элемент
                 if period_field.tag_name.lower() != 'select':
                     self.logger.error(f"❌ Поле периода отчета не является SELECT элементом. Найден: {period_field.tag_name}")
                     self.logger.info(f"   ID элемента: {period_field.get_attribute('id')}")
                     self.logger.info(f"   Классы элемента: {period_field.get_attribute('class')}")
                     return False
-                
+
                 # Получаем значение для периода
                 period_value = self.form_elements.get_period_value(period_name)
                 if not period_value:
@@ -154,37 +154,60 @@ class FormFiller:
             return False
 
     def set_reason(self):
-        """Установить причину обращения"""
+        """Установить причину обращения через выпадающий список с чекбоксами"""
         try:
             self.logger.info("🔍 Устанавливаем причину обращения")
-
+            
             # Переключаемся на iframe
             if not self.iframe_handler.switch_to_iframe():
                 return False
-
+            
             try:
-                # Ищем поле причины обращения
-                reason_selector = self.form_elements.get_element_selector('reason_field')
-                reason_field = self.iframe_handler.find_element_in_iframe(reason_selector)
-
-                if not reason_field:
-                    self.logger.error("❌ Поле причины обращения не найдено")
+                # 1. Сначала нажимаем на кнопку выпадающего списка
+                dropdown_toggle_selector = self.form_elements.get_dropdown_selector('reason_dropdown_toggle')
+                if not dropdown_toggle_selector:
+                    self.logger.error("❌ Селектор кнопки выпадающего списка не найден")
                     return False
-
-                # Получаем значение причины
-                reason_value = self.form_elements.REASON_VALUE
-
-                # Очищаем поле и вводим причину
-                reason_field.clear()
-                reason_field.send_keys(reason_value)
-
-                self.logger.info(f"✅ Причина обращения установлена: {reason_value}")
+                
+                dropdown_toggle = self.iframe_handler.find_element_in_iframe(dropdown_toggle_selector)
+                if not dropdown_toggle:
+                    self.logger.error("❌ Кнопка выпадающего списка не найдена")
+                    return False
+                
+                self.logger.info("📋 Открываем выпадающий список причины обращения...")
+                dropdown_toggle.click()
+                
+                # Ждем появления выпадающего списка
+                time.sleep(2)
+                
+                # 2. Теперь выбираем нужный чекбокс
+                checkbox_selector = self.form_elements.get_dropdown_selector('reason_checkbox')
+                if not checkbox_selector:
+                    self.logger.error("❌ Селектор чекбокса не найден")
+                    return False
+                
+                checkbox = self.iframe_handler.find_element_in_iframe(checkbox_selector)
+                if not checkbox:
+                    self.logger.error("❌ Чекбокс 'Низкая скорость в 3G/4G' не найден")
+                    return False
+                
+                # Проверяем, не выбран ли уже чекбокс
+                if not checkbox.is_selected():
+                    self.logger.info("✅ Выбираем чекбокс 'Низкая скорость в 3G/4G'...")
+                    checkbox.click()
+                else:
+                    self.logger.info("✅ Чекбокс 'Низкая скорость в 3G/4G' уже выбран")
+                
+                # Ждем применения выбора
+                time.sleep(1)
+                
+                self.logger.info("✅ Причина обращения установлена: Низкая скорость в 3G/4G")
                 return True
-
+                
             finally:
                 # Возвращаемся в основной документ
                 self.iframe_handler.switch_to_main_document()
-
+                
         except Exception as e:
             self.logger.error(f"❌ Ошибка при установке причины обращения: {e}")
             # Возвращаемся в основной документ в случае ошибки
