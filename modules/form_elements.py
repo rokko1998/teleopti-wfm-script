@@ -14,7 +14,7 @@ class FormElements:
         'reason_field': 'input[name="ReportViewerControl$ctl04$ctl23$txtValue"]',       # Причина обращения (INPUT)
         'submit_button': '#ReportViewerControl_ctl04_ctl00',                     # Кнопка отправки (INPUT)
     }
-    
+
     # Селекторы для выпадающих списков и чекбоксов
     DROPDOWN_SELECTORS = {
         'reason_dropdown_toggle': '#ReportViewerControl_ctl04_ctl23_divDropDown_ctl00',  # Кнопка выпадающего списка причины
@@ -49,7 +49,7 @@ class FormElements:
     def get_test_date(cls, date_type):
         """Получить тестовую дату по типу"""
         return cls.TEST_DATES.get(date_type)
-    
+
     @classmethod
     def get_dropdown_selector(cls, dropdown_name):
         """Получить CSS селектор для выпадающего списка по имени"""

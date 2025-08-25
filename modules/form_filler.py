@@ -91,12 +91,24 @@ class FormFiller:
 
                 # Получаем тестовую дату
                 start_date = self.form_elements.get_test_date('start_date')
-
-                # Очищаем поле и вводим дату
-                start_date_field.clear()
-                start_date_field.send_keys(start_date)
-
-                self.logger.info(f"✅ Дата начала установлена: {start_date}")
+                
+                # Используем JavaScript для установки значения (поле имеет кастомные обработчики)
+                self.logger.info(f"📝 Устанавливаем дату через JavaScript: {start_date}")
+                self.driver.execute_script("arguments[0].value = arguments[1];", start_date_field, start_date)
+                
+                # Триггерим событие onchange для активации JavaScript обработчиков
+                self.driver.execute_script("arguments[0].onchange();", start_date_field)
+                
+                # Ждем немного для применения изменений
+                time.sleep(1)
+                
+                # Проверяем, что значение установилось
+                actual_value = start_date_field.get_attribute('value')
+                if start_date in actual_value:
+                    self.logger.info(f"✅ Дата начала установлена: {start_date}")
+                else:
+                    self.logger.warning(f"⚠️ Дата установлена, но значение отличается: {actual_value}")
+                
                 return True
 
             finally:
@@ -132,12 +144,24 @@ class FormFiller:
 
                 # Получаем тестовую дату
                 end_date = self.form_elements.get_test_date('end_date')
-
-                # Очищаем поле и вводим дату
-                end_date_field.clear()
-                end_date_field.send_keys(end_date)
-
-                self.logger.info(f"✅ Дата окончания установлена: {end_date}")
+                
+                # Используем JavaScript для установки значения (поле имеет кастомные обработчики)
+                self.logger.info(f"📝 Устанавливаем дату через JavaScript: {end_date}")
+                self.driver.execute_script("arguments[0].value = arguments[1];", end_date_field, end_date)
+                
+                # Триггерим событие onchange для активации JavaScript обработчиков
+                self.driver.execute_script("arguments[0].onchange();", end_date_field)
+                
+                # Ждем немного для применения изменений
+                time.sleep(1)
+                
+                # Проверяем, что значение установилось
+                actual_value = end_date_field.get_attribute('value')
+                if end_date in actual_value:
+                    self.logger.info(f"✅ Дата окончания установлена: {end_date}")
+                else:
+                    self.logger.warning(f"⚠️ Дата установлена, но значение отличается: {actual_value}")
+                
                 return True
 
             finally:
@@ -157,57 +181,57 @@ class FormFiller:
         """Установить причину обращения через выпадающий список с чекбоксами"""
         try:
             self.logger.info("🔍 Устанавливаем причину обращения")
-            
+
             # Переключаемся на iframe
             if not self.iframe_handler.switch_to_iframe():
                 return False
-            
+
             try:
                 # 1. Сначала нажимаем на кнопку выпадающего списка
                 dropdown_toggle_selector = self.form_elements.get_dropdown_selector('reason_dropdown_toggle')
                 if not dropdown_toggle_selector:
                     self.logger.error("❌ Селектор кнопки выпадающего списка не найден")
                     return False
-                
+
                 dropdown_toggle = self.iframe_handler.find_element_in_iframe(dropdown_toggle_selector)
                 if not dropdown_toggle:
                     self.logger.error("❌ Кнопка выпадающего списка не найдена")
                     return False
-                
+
                 self.logger.info("📋 Открываем выпадающий список причины обращения...")
                 dropdown_toggle.click()
-                
+
                 # Ждем появления выпадающего списка
                 time.sleep(2)
-                
+
                 # 2. Теперь выбираем нужный чекбокс
                 checkbox_selector = self.form_elements.get_dropdown_selector('reason_checkbox')
                 if not checkbox_selector:
                     self.logger.error("❌ Селектор чекбокса не найден")
                     return False
-                
+
                 checkbox = self.iframe_handler.find_element_in_iframe(checkbox_selector)
                 if not checkbox:
                     self.logger.error("❌ Чекбокс 'Низкая скорость в 3G/4G' не найден")
                     return False
-                
+
                 # Проверяем, не выбран ли уже чекбокс
                 if not checkbox.is_selected():
                     self.logger.info("✅ Выбираем чекбокс 'Низкая скорость в 3G/4G'...")
                     checkbox.click()
                 else:
                     self.logger.info("✅ Чекбокс 'Низкая скорость в 3G/4G' уже выбран")
-                
+
                 # Ждем применения выбора
                 time.sleep(1)
-                
+
                 self.logger.info("✅ Причина обращения установлена: Низкая скорость в 3G/4G")
                 return True
-                
+
             finally:
                 # Возвращаемся в основной документ
                 self.iframe_handler.switch_to_main_document()
-                
+
         except Exception as e:
             self.logger.error(f"❌ Ошибка при установке причины обращения: {e}")
             # Возвращаемся в основной документ в случае ошибки
