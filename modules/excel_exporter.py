@@ -16,21 +16,50 @@ class ExcelExporter:
         self.driver = driver
         self.logger = logger
 
-    def wait_for_report_ready(self, timeout=60):
-        """Дождаться готовности отчета"""
+    def wait_for_report_ready(self, timeout=120):
+        """Дождаться готовности отчета через проверку по промежуткам"""
         try:
             self.logger.info("⏳ Ждем готовности отчета...")
-
-            # Ждем появления кнопки сохранения (она появляется после загрузки отчета)
-            save_button = WebDriverWait(self.driver, timeout).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "a[title*='Сохранить'], a[title*='Save'], button[title*='Сохранить'], button[title*='Save']"))
-            )
-
-            self.logger.info("✅ Отчет готов, кнопка сохранения найдена")
-            return True
-
+            
+            # Проверяем каждые 5 секунд в течение timeout
+            check_interval = 5
+            max_checks = timeout // check_interval
+            
+            for check_num in range(max_checks):
+                self.logger.info(f"🔍 Проверка {check_num + 1}/{max_checks} - ищем кнопку экспорта...")
+                
+                # Ищем кнопку экспорта по различным селекторам
+                export_selectors = [
+                    "a[onclick*='exportReport']",
+                    "a[onclick*='EXCELOPENXML']",
+                    "a[title*='Экспорт']",
+                    "a[title*='Export']",
+                    "a[alt*='Excel']",
+                    "a[class*='ActiveLink']",
+                    "div[id*='Export'] a",
+                    "div[class*='ToolbarExport'] a"
+                ]
+                
+                for selector in export_selectors:
+                    try:
+                        export_button = self.driver.find_element(By.CSS_SELECTOR, selector)
+                        if export_button.is_displayed() and export_button.is_enabled():
+                            self.logger.info(f"✅ Кнопка экспорта найдена: {selector}")
+                            self.logger.info("✅ Отчет готов к экспорту")
+                            return True
+                    except:
+                        continue
+                
+                # Если кнопка не найдена, ждем и проверяем снова
+                if check_num < max_checks - 1:  # Не ждем после последней проверки
+                    self.logger.info(f"⏳ Кнопка экспорта не найдена, ждем {check_interval} секунд...")
+                    time.sleep(check_interval)
+            
+            self.logger.error(f"❌ Отчет не загрузился за {timeout} секунд")
+            return False
+            
         except Exception as e:
-            self.logger.error(f"❌ Отчет не загрузился за {timeout} секунд: {e}")
+            self.logger.error(f"❌ Ошибка при ожидании готовности отчета: {e}")
             return False
 
     def find_save_button(self):
@@ -138,26 +167,54 @@ class ExcelExporter:
             self.logger.error(f"❌ Ошибка при выборе формата Excel: {e}")
             return False
 
-    def export_to_excel(self, wait_time=60):
+    def export_to_excel(self, wait_time=120):
         """Экспортировать отчет в Excel"""
         try:
             self.logger.info("📤 Начинаем экспорт отчета в Excel...")
-
-            # Ждем готовности отчета
+            
+            # Ждем готовности отчета (кнопка экспорта уже найдена)
             if not self.wait_for_report_ready(timeout=wait_time):
                 return False
-
-            # Нажимаем кнопку сохранения
-            if not self.click_save_button():
+            
+            # Ищем кнопку экспорта (которая уже была найдена в wait_for_report_ready)
+            export_selectors = [
+                "a[onclick*='exportReport']",
+                "a[onclick*='EXCELOPENXML']",
+                "a[title*='Экспорт']",
+                "a[title*='Export']",
+                "a[alt*='Excel']",
+                "a[class*='ActiveLink']",
+                "div[id*='Export'] a",
+                "div[class*='ToolbarExport'] a"
+            ]
+            
+            export_button = None
+            for selector in export_selectors:
+                try:
+                    export_button = self.driver.find_element(By.CSS_SELECTOR, selector)
+                    if export_button.is_displayed() and export_button.is_enabled():
+                        break
+                except:
+                    continue
+            
+            if not export_button:
+                self.logger.error("❌ Кнопка экспорта не найдена")
                 return False
-
+            
+            # Кликаем по кнопке экспорта
+            self.logger.info("💾 Нажимаем кнопку экспорта...")
+            export_button.click()
+            
+            # Ждем появления выпадающего меню
+            time.sleep(2)
+            
             # Выбираем формат Excel
             if not self.select_excel_format():
                 return False
-
+            
             self.logger.info("✅ Экспорт в Excel завершен успешно")
             return True
-
+            
         except Exception as e:
             self.logger.error(f"❌ Ошибка при экспорте в Excel: {e}")
             return False

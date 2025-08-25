@@ -50,12 +50,26 @@ class FormFiller:
                 # Создаем объект Select и выбираем значение
                 period_select = Select(period_field)
                 period_select.select_by_value(period_value)
-
+                
                 self.logger.info(f"✅ Период отчета установлен: {period_name} (значение: {period_value})")
-
-                # Ждем автоматической разблокировки полей
-                self.iframe_handler.wait_for_fields_unlock(wait_time=5)
-
+                
+                # Ждем завершения postback (ASP.NET WebForms)
+                self.logger.info("⏳ Ждем завершения postback после выбора периода...")
+                time.sleep(3)
+                
+                # После postback ищем элементы заново (избегаем stale element reference)
+                self.logger.info("🔍 Проверяем готовность элементов после postback...")
+                
+                # Проверяем, что поля дат стали доступными
+                start_date_selector = self.form_elements.get_element_selector('start_date_field')
+                start_date_field = self.iframe_handler.find_element_in_iframe(start_date_selector)
+                
+                if start_date_field and not start_date_field.get_attribute('disabled') and 'aspNetDisabled' not in start_date_field.get_attribute('class'):
+                    self.logger.info("✅ Поля дат разблокированы после выбора периода")
+                else:
+                    self.logger.warning("⚠️ Поля дат все еще заблокированы, возможно нужна дополнительная задержка")
+                    time.sleep(2)
+                
                 return True
 
             finally:
@@ -153,22 +167,22 @@ class FormFiller:
 
                 # Получаем тестовую дату
                 end_date = self.form_elements.get_test_date('end_date')
-                
+
                 # Используем JavaScript для установки значения (поле имеет кастомные обработчики)
                 self.logger.info(f"📝 Устанавливаем дату через JavaScript: {end_date}")
                 self.driver.execute_script("arguments[0].value = arguments[1];", end_date_field, end_date)
-                
+
                 # У поля даты окончания нет onchange обработчика, просто ждем
                 self.logger.info("⏳ Ждем применения изменений...")
                 time.sleep(2)
-                
+
                 # Проверяем, что значение установилось
                 actual_value = end_date_field.get_attribute('value')
                 if end_date in actual_value:
                     self.logger.info(f"✅ Дата окончания установлена: {end_date}")
                 else:
                     self.logger.warning(f"⚠️ Дата установлена, но значение отличается: {actual_value}")
-                
+
                 return True
 
             finally:
