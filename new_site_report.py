@@ -14,7 +14,6 @@ from pathlib import Path
 # Импортируем наши модули
 from modules.selenium_helpers import get_driver, apply_cdp_download_settings, setup_proxy
 from modules.new_site_handler import NewSiteReportHandler
-from modules.page_analyzer import PageAnalyzer
 
 
 # Константы
@@ -24,8 +23,6 @@ NEW_SITE_URL = (
 
 # Настройки по умолчанию
 DEFAULT_DOWNLOAD_DIR = str(Path.home() / "Downloads")
-DEFAULT_START_DAYS_AGO = 30
-DEFAULT_PERIOD = "произвольный"
 
 
 def setup_logging(level=logging.INFO):
@@ -67,20 +64,6 @@ def parse_arguments():
         '--download-dir',
         default=DEFAULT_DOWNLOAD_DIR,
         help=f'Директория для загрузки файлов (по умолчанию: {DEFAULT_DOWNLOAD_DIR})'
-    )
-
-    parser.add_argument(
-        '--start-days-ago',
-        type=int,
-        default=DEFAULT_START_DAYS_AGO,
-        help=f'Количество дней назад для начала отчета (по умолчанию: {DEFAULT_START_DAYS_AGO})'
-    )
-
-    parser.add_argument(
-        '--period',
-        default=DEFAULT_PERIOD,
-        choices=['произвольный', 'день', 'неделя', 'месяц', '7_дней', 'сегодня'],
-        help=f'Период отчета (по умолчанию: {DEFAULT_PERIOD})'
     )
 
     parser.add_argument(
@@ -189,31 +172,6 @@ def main():
 
         # Открываем новый сайт
         if open_new_site(driver, NEW_SITE_URL, logger):
-            # Создаем анализатор страницы
-            page_analyzer = PageAnalyzer(driver, logger)
-
-            # Анализируем структуру страницы
-            logger.info("🔍 Анализируем структуру страницы...")
-            analysis_file = page_analyzer.get_page_html_structure()
-
-            if analysis_file:
-                logger.info(f"✅ Анализ страницы сохранен в: {analysis_file}")
-
-            # Выполняем детальный анализ элементов формы
-            logger.info("🔍 Выполняем детальный анализ элементов формы...")
-            form_elements = page_analyzer.analyze_report_form_elements()
-
-            if form_elements:
-                logger.info("✅ Детальный анализ элементов формы завершен")
-                # Выводим найденные элементы
-                for element_name, element in form_elements.items():
-                    if element:
-                        logger.info(f"✅ {element_name}: найден")
-                    else:
-                        logger.warning(f"⚠️ {element_name}: не найден")
-            else:
-                logger.warning("⚠️ Детальный анализ элементов формы не выполнен")
-
             if args.analyze_only:
                 # Только анализ, ждем инструкций пользователя
                 logger.info("📊 Режим анализа завершен")
@@ -225,9 +183,29 @@ def main():
                 # Создаем обработчик отчетов
                 report_handler = NewSiteReportHandler(driver, logger)
 
-                # Рассчитываем даты
-                end_date = datetime.now()
-                start_date = end_date - timedelta(days=args.start_days_ago)
+                # Запрашиваем даты у пользователя
+                logger.info("📅 Введите даты для отчета:")
+                
+                # Дата начала
+                while True:
+                    try:
+                        start_date_str = input("Введите дату начала (формат ДД.ММ.ГГГГ, например 01.01.2025): ").strip()
+                        start_date = datetime.strptime(start_date_str, "%d.%m.%Y")
+                        break
+                    except ValueError:
+                        logger.error("❌ Неверный формат даты. Используйте формат ДД.ММ.ГГГГ")
+                
+                # Дата окончания
+                while True:
+                    try:
+                        end_date_str = input("Введите дату окончания (формат ДД.ММ.ГГГГ, например 31.01.2025): ").strip()
+                        end_date = datetime.strptime(end_date_str, "%d.%m.%Y")
+                        if end_date < start_date:
+                            logger.error("❌ Дата окончания не может быть раньше даты начала")
+                            continue
+                        break
+                    except ValueError:
+                        logger.error("❌ Неверный формат даты. Используйте формат ДД.ММ.ГГГГ")
 
                 logger.info(f"📅 Период отчета: с {start_date.strftime('%d.%m.%Y')} по {end_date.strftime('%d.%m.%Y')}")
                 logger.info(f"📊 Тип периода: произвольный (всегда)")
