@@ -155,269 +155,103 @@ def main():
 
             logger.info(f"📊 Найдено {len(df_to_process)} проблем для даты {target_date.strftime('%d.%m.%Y')}")
 
-            # Открываем Excel файл один раз для пакетного сохранения
-            from openpyxl import load_workbook
-            try:
-                workbook = load_workbook(input_xlsx_path)
-                report_sheet = workbook["Отчет"]
-                logger.info("✅ Excel файл открыт для пакетного сохранения (каждые 10 записей)")
-            except Exception as e:
-                logger.error(f"❌ Не удалось открыть Excel файл: {e}")
-                return
-
-            # Инициализируем счетчики для прогресса
-            total_rows = len(df_to_process)
-            processed_rows = 0
-            save_counter = 0
-            batch_size = 10
-
-            logger.info(f"🚀 Начинаем обработку {total_rows} строк...")
-            logger.info(f"📦 Пакетное сохранение каждые {batch_size} записей")
-
             # Обрабатываем каждую строку из выбранного DataFrame
             for idx, row in df_to_process.iterrows():
                 region = row["Регион"]
                 mass_number = row["Номер массовой"]
-
-                # Показываем прогресс
-                processed_rows += 1
-                progress_percent = (processed_rows / total_rows) * 100
-                logger.info(f"🔄 [{processed_rows}/{total_rows}] ({progress_percent:.1f}%) Обрабатываем: {mass_number} - {region}")
+                logger.info(f"🔄 Обрабатываем строку #{idx}: {mass_number} - {region}")
 
                 # Проверяем есть ли регион в конфигурации
                 if not validate_region_in_config(region, cfg):
                     logger.warning(f"⚠️ Регион '{region}' не найден в конфигурации, пропускаем")
                     continue
 
-                # Проверяем корректность дат (на NaT значения)
-                import pandas as pd
-                if pd.isna(row.get('Старт')):
-                    logger.warning(f"⚠️ Строка {mass_number}: обнаружено NaT значение в дате начала - пропускаем")
-                    # Записываем нули в колонки "Потерянные" и "Превышение" для строк с некорректными датами
-                    try:
-                        workbook, report_sheet, save_counter, skip_reason = save_single_result_to_original_file(
-                            mass_number=mass_number,
-                            lost_calls=0,
-                            excess_traffic=0.0,
-                            original_file_path=input_xlsx_path,
-                            row_index=idx,
-                            workbook=workbook,
-                            report_sheet=report_sheet,
-                            save_counter=save_counter
-                        )
-
-                        if skip_reason == "already_processed":
-                            logger.info(f"⏭️ Строка {mass_number} уже обработана - пропускаем")
-                            continue
-                        elif skip_reason == "success":
-                            logger.info(f"✅ Нули записаны для {mass_number} (NaT в дате начала)")
-
-                            # Проверяем нужно ли сохранить пакет
-                            if save_counter >= batch_size:
-                                logger.info(f"📦 Сохраняем пакет из {save_counter} записей...")
-                                from modules.excel_manager import save_excel_batch
-                                if save_excel_batch(workbook, report_sheet, input_xlsx_path):
-                                    save_counter = 0  # Сбрасываем счетчик
-                                    logger.info(f"✅ Пакет успешно сохранен! Прогресс: {processed_rows}/{total_rows} ({progress_percent:.1f}%)")
-                        else:
-                            logger.warning(f"⚠️ Неожиданный результат сохранения: {skip_reason}")
-
-                    except Exception as save_exc:
-                        logger.error(f"❌ ОШИБКА СОХРАНЕНИЯ для {mass_number}: {save_exc}")
-                        continue
-
-                    # Создаем запись результата с нулями
-                    result = create_result_record(
-                        mass_number,
-                        'NaT_start_date',  # специальное значение для строк с некорректной датой начала
-                        0,  # lost_calls = 0
-                        0.0  # excess_traffic = 0.0
-                    )
-                    results.append(result)
-                    continue
-
-                # Если Окончание = NaT, значит проблема открыта - это нормально
-                if pd.isna(row.get('Окончание')):
-                    logger.info(f"📅 Строка {mass_number}: проблема открыта (Окончание = NaT) - обрабатываем как открытую")
-
-                # Проверяем колонку "Заметки" для определения необходимости обработки
-                from modules.excel_manager import check_notes_column
-                should_skip_notes, notes_value, notes_reason = check_notes_column(workbook, report_sheet, idx + 2)  # +2 так как Excel строки начинаются с 1, а заголовок на строке 1
-
-                if should_skip_notes:
-                    logger.info(f"📝 Пропускаем вычисления для {mass_number} (заметка = {notes_value} < 50)")
-                    # Записываем нули в колонки "Потерянные" и "Превышение"
-                    try:
-                        workbook, report_sheet, save_counter, skip_reason = save_single_result_to_original_file(
-                            mass_number=mass_number,
-                            lost_calls=0,
-                            excess_traffic=0.0,
-                            original_file_path=input_xlsx_path,
-                            row_index=idx,
-                            workbook=workbook,
-                            report_sheet=report_sheet,
-                            save_counter=save_counter
-                        )
-
-                        if skip_reason == "already_processed":
-                            logger.info(f"⏭️ Строка {mass_number} уже обработана - пропускаем")
-                            continue
-                        elif skip_reason == "success":
-                            logger.info(f"✅ Нули записаны для {mass_number} (заметка < 50)")
-
-                            # Проверяем нужно ли сохранить пакет
-                            if save_counter >= batch_size:
-                                logger.info(f"📦 Сохраняем пакет из {save_counter} записей...")
-                                from modules.excel_manager import save_excel_batch
-                                if save_excel_batch(workbook, report_sheet, input_xlsx_path):
-                                    save_counter = 0  # Сбрасываем счетчик
-                                    logger.info(f"✅ Пакет успешно сохранен! Прогресс: {processed_rows}/{total_rows} ({progress_percent:.1f}%)")
-                        else:
-                            logger.warning(f"⚠️ Неожиданный результат сохранения: {skip_reason}")
-
-                    except Exception as save_exc:
-                        logger.error(f"❌ ОШИБКА СОХРАНЕНИЯ для {mass_number}: {save_exc}")
-                        continue
-
-                    # Создаем запись результата с нулями
-                    result = create_result_record(
-                        mass_number,
-                        row.get('Старт', 'unknown').strftime('%Y-%m-%d') if hasattr(row.get('Старт', ''), 'strftime') else 'unknown',
-                        0,  # lost_calls = 0
-                        0.0  # excess_traffic = 0.0
-                    )
-                    results.append(result)
-                    continue
-
                 workload_params = cfg["regions"][region]
 
-                # Разбиваем на дневные окна
-                time_windows = list(windows_for_row(row))
-                logger.info(f"📊 Создано временных окон: {len(time_windows)}")
+                # ОТЛАДКА: Показываем исходные времена из Excel
+                logger.info(f"📅 Исходные данные из Excel:")
+                logger.info(f"   Старт: {row['Старт']} (тип: {type(row['Старт'])})")
+                logger.info(f"   Окончание: {row['Окончание']} (тип: {type(row['Окончание'])})")
 
-                for window_idx, (win_start, win_end) in enumerate(time_windows):
-                    logger.info(f"🔸 Обрабатываем окно #{window_idx + 1}/{len(time_windows)}")
-                    
-                    # ОТЛАДКА: Показываем детали временного окна
-                    logger.info(f"🔍 Временное окно #{window_idx + 1}: {win_start} - {win_end}")
-                    logger.info(f"🔍 Типы данных: win_start={type(win_start)}, win_end={type(win_end)}")
+                # Получаем временное окно для указанной даты
+                win_start, win_end = calculate_time_window_for_date(row, target_date)
 
-                    # Преобразуем в datetime без изменения часового пояса
-                    win_start = prepare_datetime_for_report(win_start)
-                    win_end = prepare_datetime_for_report(win_end)
-                    
-                    # ОТЛАДКА: Показываем преобразованные даты
-                    logger.info(f"🔍 Преобразованные даты: {win_start} - {win_end}")
+                logger.info(f"🕒 Временное окно (исходное):")
+                logger.info(f"   win_start: {win_start} (тип: {type(win_start)})")
+                logger.info(f"   win_end: {win_end} (тип: {type(win_end)})")
 
+                # Преобразуем в datetime без изменения часового пояса
+                # Время уже в МСК как в Excel файле - НЕ МЕНЯЕМ часовой пояс!
+                win_start = prepare_datetime_for_report(win_start)
+                win_end = prepare_datetime_for_report(win_end)
+
+                logger.info(f"🕒 Временное окно (финальное МСК):")
+                logger.info(f"   win_start: {win_start}")
+                logger.info(f"   win_end: {win_end}")
+
+                try:
+                    logger.info(f"🚀 Запускаем download_report для {mass_number} {win_start.date()}")
+                    xlsx_path = download_report(driver, workload_params, win_start, win_end)
+                    logger.info(f"📊 Обрабатываем метрики из файла: {xlsx_path}")
+                    lost, excess = calc_metrics(xlsx_path)
+
+                    # Сохраняем результат сразу в исходный файл
                     try:
-                        logger.info(f"🚀 Запускаем download_report для {mass_number} {win_start.date()}")
-                        logger.info(f"🔍 Передаем в download_report: start={win_start}, end={win_end}")
-                        xlsx_path = download_report(driver, workload_params, win_start, win_end)
-                        logger.info(f"📊 Обрабатываем метрики из файла: {xlsx_path}")
-                        lost, excess = calc_metrics(xlsx_path)
-                        
-                        # ОТЛАДКА: Показываем результаты расчета
-                        logger.info(f"🔍 Результаты расчета: lost={lost}, excess={excess}")
-
-                        # Сохраняем результат в уже открытый Excel файл
-                        try:
-                            workbook, report_sheet, save_counter, skip_reason = save_single_result_to_original_file(
-                                mass_number=mass_number,
-                                lost_calls=lost,
-                                excess_traffic=excess,
-                                original_file_path=input_xlsx_path,
-                                row_index=idx,
-                                workbook=workbook,
-                                report_sheet=report_sheet,
-                                save_counter=save_counter
-                            )
-
-                            if skip_reason == "already_processed":
-                                logger.info(f"⏭️ Строка {mass_number} уже обработана - пропускаем")
-                                break  # Выходим из цикла окон для этой строки
-                            elif skip_reason == "success":
-                                logger.info(f"✅ Результат записан в файл: {mass_number} → lost={lost}, excess={excess}")
-
-                                # Проверяем нужно ли сохранить пакет
-                                if save_counter >= batch_size:
-                                    logger.info(f"📦 Сохраняем пакет из {save_counter} записей...")
-                                    from modules.excel_manager import save_excel_batch
-                                    if save_excel_batch(workbook, report_sheet, input_xlsx_path):
-                                        save_counter = 0  # Сбрасываем счетчик
-                                        logger.info(f"✅ Пакет успешно сохранен! Прогресс: {processed_rows}/{total_rows} ({progress_percent:.1f}%)")
-                            else:
-                                logger.warning(f"⚠️ Неожиданный результат сохранения: {skip_reason}")
-
-                        except Exception as save_exc:
-                            logger.error(f"❌ ОШИБКА СОХРАНЕНИЯ для {mass_number}: {save_exc}")
-                            logger.error(f"   Продолжаем выполнение без сохранения в файл")
-                            continue
-
-                        # Создаем запись результата для возможного сохранения в CSV
-                        result = create_result_record(
-                            mass_number,
-                            win_start.date().isoformat(),
-                            lost,
-                            excess
+                        save_single_result_to_original_file(
+                            mass_number=mass_number,
+                            lost_calls=lost,
+                            excess_traffic=excess,
+                            original_file_path=input_xlsx_path,
+                            row_index=idx
                         )
-                        results.append(result)
-
-                        logger.info(f"✅ Успешно обработан {mass_number} - {region}: lost={lost}, excess={excess}")
-                    except Exception as exc:
-                        logger.error(f"❌ ОШИБКА для строки #{idx} MassID {mass_number} {region}")
-                        try:
-                            logger.error(f"   Период: {win_start.date()} - {win_end.date()}")
-                        except:
-                            logger.error(f"   Период: не удалось определить")
-                        logger.error(f"   Детали ошибки: {exc}")
-                        logger.exception("   Полный traceback:")
+                        logger.info(f"✅ Результат сохранен в файл: {mass_number} → lost={lost}, excess={excess}")
+                    except PermissionError as pe:
+                        logger.error(f"❌ ОШИБКА ДОСТУПА: Файл {input_xlsx_path} открыт в Excel или заблокирован")
+                        logger.error(f"   Закройте файл в Excel и попробуйте снова")
+                        logger.error(f"   Детали: {pe}")
+                        # Продолжаем выполнение, но не добавляем в results
+                        continue
+                    except Exception as save_exc:
+                        logger.error(f"❌ ОШИБКА СОХРАНЕНИЯ для {mass_number}: {save_exc}")
+                        logger.error(f"   Продолжаем выполнение без сохранения в файл")
+                        # Продолжаем выполнение, но не добавляем в results
                         continue
 
-            # Сохраняем оставшиеся записи, если они есть
-            if save_counter > 0:
-                logger.info(f"📦 Сохраняем финальный пакет из {save_counter} записей...")
-                try:
-                    from modules.excel_manager import save_excel_batch
-                    if save_excel_batch(workbook, report_sheet, input_xlsx_path):
-                        logger.info(f"✅ Финальный пакет успешно сохранен!")
-                except Exception as final_save_e:
-                    logger.error(f"❌ Ошибка при сохранении финального пакета: {final_save_e}")
+                    # Создаем запись результата для возможного сохранения в CSV
+                    result = create_result_record(
+                        mass_number,
+                        win_start.date().isoformat(),
+                        lost,
+                        excess
+                    )
+                    results.append(result)
+
+                    logger.info(f"✅ Успешно обработан {mass_number} - {region}: lost={lost}, excess={excess}")
+                except Exception as exc:
+                    logger.error(f"❌ ОШИБКА для строки #{idx} MassID {mass_number} {region}")
+                    try:
+                        logger.error(f"   Период: {win_start.date()} - {win_end.date()}")
+                    except:
+                        logger.error(f"   Период: не удалось определить")
+                    logger.error(f"   Детали ошибки: {exc}")
+                    logger.exception("   Полный traceback:")
+                    continue
 
             logger.info(f"🎉 Обработка завершена! Обработано {len(results)} проблем")
-            logger.info(f"💾 Все результаты сохранены в исходный файл: {input_xlsx_path}")
+            logger.info(f"💾 Результаты сохранены в исходный файл: {input_xlsx_path}")
 
         else:
             # Стандартный режим: обработка всех проблем
             logger.info("📋 Используется стандартный режим обработки всех проблем")
 
-            # Инициализируем счетчики для прогресса
-            total_rows = len(df)
-            processed_rows = 0
-
-            logger.info(f"🚀 Начинаем обработку {total_rows} строк...")
-
             # Обрабатываем каждую строку
             for idx, row in df.iterrows():
                 region = row["Регион"]
-
-                # Показываем прогресс
-                processed_rows += 1
-                progress_percent = (processed_rows / total_rows) * 100
-                logger.info(f"🔄 [{processed_rows}/{total_rows}] ({progress_percent:.1f}%) Обрабатываем: {row['Номер массовой']} - {region}")
+                logger.info(f"🔄 Обрабатываем строку #{idx}: {row['Номер массовой']} - {region}")
 
                 # Проверяем есть ли регион в конфигурации
                 if not validate_region_in_config(region, cfg):
                     continue
-
-                # Проверяем корректность дат (на NaT значения)
-                import pandas as pd
-                if pd.isna(row.get('Старт')):
-                    logger.warning(f"⚠️ Строка {row['Номер массовой']}: обнаружено NaT значение в дате начала - пропускаем")
-                    continue
-
-                # Если Окончание = NaT, значит проблема открыта - это нормально
-                if pd.isna(row.get('Окончание')):
-                    logger.info(f"📅 Строка {row['Номер массовой']}: проблема открыта (Окончание = NaT) - обрабатываем как открытую")
 
                 workload_params = cfg["regions"][region]
 
@@ -427,10 +261,17 @@ def main():
 
                 for window_idx, (win_start, win_end) in enumerate(time_windows):
                     logger.info(f"🔸 Обрабатываем окно #{window_idx + 1}/{len(time_windows)}")
+                    logger.info(f"🕒 Временное окно (исходное):")
+                    logger.info(f"   win_start: {win_start} (тип: {type(win_start)})")
+                    logger.info(f"   win_end: {win_end} (тип: {type(win_end)})")
 
                     # Преобразуем в datetime без изменения часового пояса
                     win_start = prepare_datetime_for_report(win_start)
                     win_end = prepare_datetime_for_report(win_end)
+
+                    logger.info(f"🕒 Временное окно (финальное МСК):")
+                    logger.info(f"   win_start: {win_start}")
+                    logger.info(f"   win_end: {win_end}")
 
                     try:
                         logger.info(f"🚀 Запускаем download_report для {row['Номер массовой']} {win_start.date()}")
@@ -438,29 +279,7 @@ def main():
                         logger.info(f"📊 Обрабатываем метрики из файла: {xlsx_path}")
                         lost, excess = calc_metrics(xlsx_path)
 
-                        # Сохраняем результат сразу в исходный файл
-                        try:
-                            save_single_result_to_original_file(
-                                mass_number=row["Номер массовой"],
-                                lost_calls=lost,
-                                excess_traffic=excess,
-                                original_file_path=input_xlsx_path,
-                                row_index=idx
-                            )
-                            logger.info(f"✅ Результат сохранен в файл: {row['Номер массовой']} → lost={lost}, excess={excess}")
-                        except PermissionError as pe:
-                            logger.error(f"❌ ОШИБКА ДОСТУПА: Файл {input_xlsx_path} открыт в Excel или заблокирован")
-                            logger.error(f"   Закройте файл в Excel и попробуйте снова")
-                            logger.error(f"   Детали: {pe}")
-                            # Продолжаем выполнение, но не добавляем в results
-                            continue
-                        except Exception as save_exc:
-                            logger.error(f"❌ ОШИБКА СОХРАНЕНИЯ для {row['Номер массовой']}: {save_exc}")
-                            logger.error(f"   Продолжаем выполнение без сохранения в файл")
-                            # Продолжаем выполнение, но не добавляем в results
-                            continue
-
-                        # Создаем запись результата для возможного сохранения в CSV
+                        # Создаем запись результата
                         result = create_result_record(
                             row["Номер массовой"],
                             win_start.date().isoformat(),
@@ -479,8 +298,6 @@ def main():
                         logger.error(f"   Детали ошибки: {exc}")
                         logger.exception("   Полный traceback:")
                         continue
-
-            logger.info(f"🎉 Обработка завершена! Обработано {len(results)} проблем")
 
             # Сохраняем в CSV файл (стандартный режим)
             save_results_to_csv(results, out_csv_path)
