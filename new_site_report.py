@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 # Импортируем наши модули
-from modules.selenium_helpers import get_driver, apply_cdp_download_settings
+from modules.selenium_helpers import get_driver, apply_cdp_download_settings, setup_proxy
 from modules.new_site_handler import NewSiteReportHandler
 from modules.page_analyzer import PageAnalyzer
 
@@ -169,6 +169,10 @@ def main():
         return 1
 
     logger.info(f"📁 Директория для загрузки: {download_dir}")
+
+    # Настраиваем прокси (как в основном скрипте)
+    setup_proxy()
+    logger.info("✅ Прокси настроен")
 
     # Создаем WebDriver
     try:
