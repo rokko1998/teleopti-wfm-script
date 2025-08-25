@@ -192,7 +192,7 @@ def main():
                 logger.info(f"🔍 Причина обращения: {args.reason}")
 
                 # Обрабатываем отчет
-                success = report_handler.process_report(wait_time=args.wait_time)
+                success = report_handler.process_report()
 
                 if success:
                     logger.info("🎉 Отчет успешно обработан и экспортирован в Excel")
