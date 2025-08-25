@@ -94,6 +94,203 @@ class PageAnalyzer:
         except Exception as e:
             self.logger.error(f"❌ Ошибка при анализе элементов форм: {e}")
 
+    def analyze_report_form_elements(self):
+        """
+        Детально анализирует элементы формы отчета для поиска:
+        - Период отчета (выпадающий список)
+        - Дата начала (поле ввода)
+        - Дата окончания (поле ввода)
+        - Причина обращения (выпадающий список)
+        """
+        try:
+            self.logger.info("🔍 Детальный анализ элементов формы отчета...")
+
+            # Словарь для хранения найденных элементов
+            found_elements = {
+                'period_dropdown': None,
+                'start_date_field': None,
+                'end_date_field': None,
+                'reason_dropdown': None,
+                'submit_button': None
+            }
+
+            # 1. Ищем поле "Период отчета" (выпадающий список)
+            self.logger.info("🔍 Ищем поле 'Период отчета'...")
+            period_selectors = [
+                "//select[contains(@id, 'period') or contains(@id, 'Period')]",
+                "//select[contains(@name, 'period') or contains(@name, 'Period')]",
+                "//select[preceding-sibling::*[contains(text(), 'Период') or contains(text(), 'Period')]]",
+                "//select[following-sibling::*[contains(text(), 'Период') or contains(text(), 'Period')]]",
+                "//select[ancestor::*[contains(text(), 'Период') or contains(text(), 'Period')]]",
+                "//select[descendant::*[contains(text(), 'Период') or contains(text(), 'Period')]]"
+            ]
+
+            for selector in period_selectors:
+                elements = self.driver.find_elements(By.XPATH, selector)
+                if elements:
+                    found_elements['period_dropdown'] = elements[0]
+                    self.logger.info(f"✅ Период отчета найден по селектору: {selector}")
+                    break
+
+            # Если не нашли по селекторам, ищем по тексту рядом
+            if not found_elements['period_dropdown']:
+                period_labels = self.driver.find_elements(By.XPATH,
+                    "//*[contains(text(), 'Период отчета') or contains(text(), 'Период') or contains(text(), 'Period')]")
+                for label in period_labels:
+                    # Ищем ближайший select элемент
+                    nearby_select = label.find_element(By.XPATH,
+                        "following-sibling::select | preceding-sibling::select | ancestor::select | descendant::select")
+                    if nearby_select:
+                        found_elements['period_dropdown'] = nearby_select
+                        self.logger.info("✅ Период отчета найден по близости к тексту")
+                        break
+
+            # 2. Ищем поле "Дата начала"
+            self.logger.info("🔍 Ищем поле 'Дата начала'...")
+            start_date_selectors = [
+                "//input[@type='date' or @type='text'][contains(@id, 'start') or contains(@id, 'Start') or contains(@id, 'begin') or contains(@id, 'from')]",
+                "//input[@type='date' or @type='text'][contains(@name, 'start') or contains(@name, 'Start') or contains(@name, 'begin') or contains(@name, 'from')]",
+                "//input[@type='date' or @type='text'][preceding-sibling::*[contains(text(), 'Начало') or contains(text(), 'С') or contains(text(), 'Start') or contains(text(), 'From')]]",
+                "//input[@type='date' or @type='text'][following-sibling::*[contains(text(), 'Начало') or contains(text(), 'С') or contains(text(), 'Start') or contains(text(), 'From')]]"
+            ]
+
+            for selector in start_date_selectors:
+                elements = self.driver.find_elements(By.XPATH, selector)
+                if elements:
+                    found_elements['start_date_field'] = elements[0]
+                    self.logger.info(f"✅ Дата начала найдена по селектору: {selector}")
+                    break
+
+            # 3. Ищем поле "Дата окончания"
+            self.logger.info("🔍 Ищем поле 'Дата окончания'...")
+            end_date_selectors = [
+                "//input[@type='date' or @type='text'][contains(@id, 'end') or contains(@id, 'End') or contains(@id, 'finish') or contains(@id, 'to')]",
+                "//input[@type='date' or @type='text'][contains(@name, 'end') or contains(@name, 'End') or contains(@name, 'finish') or contains(@name, 'to')]",
+                "//input[@type='date' or @type='text'][preceding-sibling::*[contains(text(), 'Окончание') or contains(text(), 'По') or contains(text(), 'End') or contains(text(), 'To')]]",
+                "//input[@type='date' or @type='text'][following-sibling::*[contains(text(), 'Окончание') or contains(text(), 'По') or contains(text(), 'End') or contains(text(), 'To')]]"
+            ]
+
+            for selector in end_date_selectors:
+                elements = self.driver.find_elements(By.XPATH, selector)
+                if elements:
+                    found_elements['end_date_field'] = elements[0]
+                    self.logger.info(f"✅ Дата окончания найдена по селектору: {selector}")
+                    break
+
+            # 4. Ищем поле "Причина обращения"
+            self.logger.info("🔍 Ищем поле 'Причина обращения'...")
+            reason_selectors = [
+                "//select[contains(@id, 'reason') or contains(@id, 'Reason') or contains(@id, 'issue') or contains(@id, 'cause')]",
+                "//select[contains(@name, 'reason') or contains(@name, 'Reason') or contains(@name, 'issue') or contains(@name, 'cause')]",
+                "//select[preceding-sibling::*[contains(text(), 'Причина') or contains(text(), 'Обращение') or contains(text(), 'Reason') or contains(text(), 'Issue')]]",
+                "//select[following-sibling::*[contains(text(), 'Причина') or contains(text(), 'Обращение') or contains(text(), 'Reason') or contains(text(), 'Issue')]]"
+            ]
+
+            for selector in reason_selectors:
+                elements = self.driver.find_elements(By.XPATH, selector)
+                if elements:
+                    found_elements['reason_dropdown'] = elements[0]
+                    self.logger.info(f"✅ Причина обращения найдена по селектору: {selector}")
+                    break
+
+            # 5. Ищем кнопку отправки
+            self.logger.info("🔍 Ищем кнопку отправки...")
+            submit_selectors = [
+                "//input[@type='submit']",
+                "//button[@type='submit']",
+                "//button[contains(text(), 'Просмотр')]",
+                "//button[contains(text(), 'Сформировать')]",
+                "//button[contains(text(), 'Отправить')]",
+                "//button[contains(text(), 'Submit')]",
+                "//button[contains(text(), 'Generate')]",
+                "//input[contains(@value, 'Просмотр')]",
+                "//input[contains(@value, 'Сформировать')]",
+                "//input[contains(@value, 'Submit')]"
+            ]
+
+            for selector in submit_selectors:
+                elements = self.driver.find_elements(By.XPATH, selector)
+                if elements:
+                    found_elements['submit_button'] = elements[0]
+                    self.logger.info(f"✅ Кнопка отправки найдена по селектору: {selector}")
+                    break
+
+            # Анализируем найденные элементы
+            self._analyze_found_elements(found_elements)
+
+            # Сохраняем детальный анализ
+            self._save_detailed_form_analysis(found_elements)
+
+            self.logger.info("✅ Детальный анализ элементов формы завершен")
+            return found_elements
+
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при детальном анализе элементов формы: {e}")
+            return {}
+
+    def _analyze_found_elements(self, found_elements):
+        """Анализирует найденные элементы формы."""
+        try:
+            self.logger.info("🔍 Анализируем найденные элементы...")
+
+            for element_name, element in found_elements.items():
+                if element:
+                    element_info = self.get_element_info(element)
+                    self.logger.info(f"✅ {element_name}: {element_info.get('tag_name', 'N/A')} "
+                                   f"(ID: {element_info.get('id', 'Нет ID')}, "
+                                   f"Name: {element_info.get('name', 'Нет name')}, "
+                                   f"Type: {element_info.get('type', 'Нет type')})")
+
+                    # Если это select, анализируем опции
+                    if element.tag_name == 'select':
+                        options = element.find_elements(By.TAG_NAME, "option")
+                        option_texts = [opt.text.strip() for opt in options if opt.text.strip()]
+                        if option_texts:
+                            self.logger.info(f"   📋 Опции: {', '.join(option_texts[:10])}{'...' if len(option_texts) > 10 else ''}")
+                else:
+                    self.logger.warning(f"⚠️ {element_name}: не найден")
+
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при анализе найденных элементов: {e}")
+
+    def _save_detailed_form_analysis(self, found_elements):
+        """Сохраняет детальный анализ элементов формы в файл."""
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"detailed_form_analysis_{timestamp}.txt"
+            filepath = os.path.join(self.analysis_dir, filename)
+
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write("=== ДЕТАЛЬНЫЙ АНАЛИЗ ЭЛЕМЕНТОВ ФОРМЫ ОТЧЕТА ===\n")
+                f.write(f"Дата анализа: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(f"URL: {self.driver.current_url}\n\n")
+
+                for element_name, element in found_elements.items():
+                    f.write(f"=== {element_name.upper()} ===\n")
+                    if element:
+                        element_info = self.get_element_info(element)
+                        f.write(f"Tag: {element_info.get('tag_name', 'N/A')}\n")
+                        f.write(f"ID: {element_info.get('id', 'Нет ID')}\n")
+                        f.write(f"Name: {element_info.get('name', 'Нет name')}\n")
+                        f.write(f"Type: {element_info.get('type', 'Нет type')}\n")
+                        f.write(f"Class: {element_info.get('class', 'Нет class')}\n")
+                        f.write(f"Value: {element_info.get('value', 'Нет value')}\n")
+
+                        # Если это select, записываем опции
+                        if element.tag_name == 'select':
+                            options = element.find_elements(By.TAG_NAME, "option")
+                            f.write(f"Опций: {len(options)}\n")
+                            for i, opt in enumerate(options[:20]):  # Первые 20 опций
+                                f.write(f"  {i+1}. {opt.text.strip()}\n")
+                    else:
+                        f.write("НЕ НАЙДЕН\n")
+                    f.write("\n")
+
+            self.logger.info(f"✅ Детальный анализ элементов формы сохранен в: {filepath}")
+
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при сохранении детального анализа: {e}")
+
     def _save_form_analysis_results(self, results):
         """Сохраняет результаты анализа форм в файл."""
         try:
