@@ -31,11 +31,17 @@ class NewSiteReportHandler:
         # ID элементов на странице
         self.ELEMENT_IDS = {
             'period_dropdown': 'ReportViewerControl_ctl04_ctl03_ddValue',
-            'start_date_field': 'ReportViewerControl_ctl04_ctl05_txtValue',
-            'end_date_field': 'ReportViewerControl_ctl04_ctl07_txtValue',
-            'reason_dropdown': 'ReportViewerControl_ctl04_ctl09_txtValue',  # Поле для причины обращения
+            'start_date_field': 'ReportViewerControl_ctl04_ctl05_txtValue',  # Дата начала
+            'end_date_field': 'ReportViewerControl_ctl04_ctl07_txtValue',    # Дата окончания (но это поле контактного центра!)
+            'reason_dropdown': 'ReportViewerControl_ctl04_ctl09_txtValue',   # Причина обращения
             'submit_button': 'ReportViewerControl_ctl04_ctl00',
             'excel_link': "//a[contains(text(), 'Excel') and contains(@class, 'ActiveLink')]"
+        }
+
+        # Тестовые даты (фиксированные для тестирования)
+        self.TEST_DATES = {
+            'start_date': '01.08.2025',
+            'end_date': '02.08.2025'
         }
 
         # Значения для периода отчета
@@ -89,11 +95,11 @@ class NewSiteReportHandler:
             time.sleep(3)
 
             # 2. Устанавливаем "Дата начала"
-            if not self._set_start_date(start_date):
+            if not self._set_start_date():  # Убираем параметр start_date
                 return False
 
             # 3. Устанавливаем "Дата окончания"
-            if not self._set_end_date(end_date):
+            if not self._set_end_date():   # Убираем параметр end_date
                 return False
 
             # 4. Устанавливаем "Причина обращения"
@@ -235,20 +241,20 @@ class NewSiteReportHandler:
             self.logger.error(f"❌ Ошибка при установке периода отчета: {e}")
             return False
 
-    def _set_start_date(self, start_date):
+    def _set_start_date(self):
         """Устанавливает дату начала."""
         try:
             # Работаем с iframe если включен режим
             if self.iframe_mode:
-                return self._set_start_date_in_iframe(start_date)
+                return self._set_start_date_in_iframe()
             else:
-                return self._set_start_date_in_main_document(start_date)
+                return self._set_start_date_in_main_document()
 
         except Exception as e:
             self.logger.error(f"❌ Ошибка при установке даты начала: {e}")
             return False
 
-    def _set_start_date_in_iframe(self, start_date):
+    def _set_start_date_in_iframe(self):
         """Устанавливает дату начала в iframe'е."""
         try:
             # Ищем iframe
@@ -272,11 +278,11 @@ class NewSiteReportHandler:
                     self.logger.warning("⚠️ Поле 'Дата начала' все еще заблокировано. Возможно, нужно сначала выбрать период отчета.")
                     return False
 
-                # Устанавливаем дату
+                # Устанавливаем фиксированную тестовую дату
                 start_date_field.clear()
-                start_date_field.send_keys(start_date.strftime("%d.%m.%Y"))
+                start_date_field.send_keys(self.TEST_DATES['start_date'])
 
-                self.logger.info(f"✅ Дата начала установлена: {start_date.strftime('%d.%m.%Y')}")
+                self.logger.info(f"✅ Дата начала установлена: {self.TEST_DATES['start_date']}")
                 return True
 
             finally:
@@ -293,7 +299,7 @@ class NewSiteReportHandler:
                 pass
             return False
 
-    def _set_start_date_in_main_document(self, start_date):
+    def _set_start_date_in_main_document(self):
         """Устанавливает дату начала в основном документе (старый метод)."""
         try:
             # Пробуем найти элемент по ID
@@ -315,30 +321,31 @@ class NewSiteReportHandler:
                 self.logger.error("❌ Элемент 'Дата начала' не готов к взаимодействию")
                 return False
 
+            # Устанавливаем фиксированную тестовую дату
             start_date_field.clear()
-            start_date_field.send_keys(start_date.strftime("%d.%m.%Y"))
+            start_date_field.send_keys(self.TEST_DATES['start_date'])
 
-            self.logger.info(f"✅ Дата начала установлена: {start_date.strftime('%d.%m.%Y')}")
+            self.logger.info(f"✅ Дата начала установлена: {self.TEST_DATES['start_date']}")
             return True
 
         except Exception as e:
             self.logger.error(f"❌ Ошибка при установке даты начала: {e}")
             return False
 
-    def _set_end_date(self, end_date):
+    def _set_end_date(self):
         """Устанавливает дату окончания."""
         try:
             # Работаем с iframe если включен режим
             if self.iframe_mode:
-                return self._set_end_date_in_iframe(end_date)
+                return self._set_end_date_in_iframe()
             else:
-                return self._set_end_date_in_main_document(end_date)
+                return self._set_end_date_in_main_document()
 
         except Exception as e:
             self.logger.error(f"❌ Ошибка при установке даты окончания: {e}")
             return False
 
-    def _set_end_date_in_iframe(self, end_date):
+    def _set_end_date_in_iframe(self):
         """Устанавливает дату окончания в iframe'е."""
         try:
             # Ищем iframe
@@ -362,11 +369,11 @@ class NewSiteReportHandler:
                     self.logger.warning("⚠️ Поле 'Дата окончания' все еще заблокировано. Возможно, нужно сначала выбрать период отчета.")
                     return False
 
-                # Устанавливаем дату
+                # Устанавливаем фиксированную тестовую дату
                 end_date_field.clear()
-                end_date_field.send_keys(end_date.strftime("%d.%m.%Y"))
+                end_date_field.send_keys(self.TEST_DATES['end_date'])
 
-                self.logger.info(f"✅ Дата окончания установлена: {end_date.strftime('%d.%m.%Y')}")
+                self.logger.info(f"✅ Дата окончания установлена: {self.TEST_DATES['end_date']}")
                 return True
 
             finally:
@@ -383,7 +390,7 @@ class NewSiteReportHandler:
                 pass
             return False
 
-    def _set_end_date_in_main_document(self, end_date):
+    def _set_end_date_in_main_document(self):
         """Устанавливает дату окончания в основном документе (старый метод)."""
         try:
             # Пробуем найти элемент по ID
@@ -405,10 +412,11 @@ class NewSiteReportHandler:
                 self.logger.error("❌ Элемент 'Дата окончания' не готов к взаимодействию")
                 return False
 
+            # Устанавливаем фиксированную тестовую дату
             end_date_field.clear()
-            end_date_field.send_keys(end_date.strftime("%d.%m.%Y"))
+            end_date_field.send_keys(self.TEST_DATES['end_date'])
 
-            self.logger.info(f"✅ Дата окончания установлена: {end_date.strftime('%d.%m.%Y')}")
+            self.logger.info(f"✅ Дата окончания установлена: {self.TEST_DATES['end_date']}")
             return True
 
         except Exception as e:
@@ -452,11 +460,17 @@ class NewSiteReportHandler:
                     self.logger.warning("⚠️ Поле 'Причина обращения' все еще заблокировано. Возможно, нужно сначала выбрать период отчета.")
                     return False
 
-                # Устанавливаем причину обращения
-                reason_field.clear()
-                reason_field.send_keys(self.REASON_VALUES.get(reason.lower(), self.REASON_VALUES['default']))
+                # Это поле со списком галочек, нужно очистить все и оставить только нужную
+                self.logger.info("🔍 Очищаем все галочки в поле 'Причина обращения'...")
 
-                self.logger.info(f"✅ Причина обращения установлена: {self.REASON_VALUES.get(reason.lower(), self.REASON_VALUES['default'])}")
+                # Очищаем поле
+                reason_field.clear()
+
+                # Устанавливаем только нужную причину обращения
+                reason_text = self.REASON_VALUES.get(reason.lower(), self.REASON_VALUES['default'])
+                reason_field.send_keys(reason_text)
+
+                self.logger.info(f"✅ Причина обращения установлена: {reason_text}")
                 return True
 
             finally:
