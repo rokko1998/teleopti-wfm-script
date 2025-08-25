@@ -48,6 +48,27 @@ class IframeHandler:
             self.logger.error(f"❌ Элемент не найден в iframe: {selector}, ошибка: {e}")
             return None
 
+    def find_element_with_diagnostics(self, selector, timeout=10):
+        """Найти элемент в iframe с подробной диагностикой"""
+        try:
+            element = WebDriverWait(self.driver, timeout).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, selector))
+            )
+            
+            # Выводим подробную информацию об элементе
+            self.logger.info(f"🔍 Элемент найден: {selector}")
+            self.logger.info(f"   Тег: {element.tag_name}")
+            self.logger.info(f"   ID: {element.get_attribute('id')}")
+            self.logger.info(f"   Классы: {element.get_attribute('class')}")
+            self.logger.info(f"   Тип: {element.get_attribute('type')}")
+            self.logger.info(f"   Значение: {element.get_attribute('value')}")
+            
+            return element
+            
+        except Exception as e:
+            self.logger.error(f"❌ Элемент не найден в iframe: {selector}, ошибка: {e}")
+            return None
+
     def wait_for_element_clickable(self, selector, timeout=10):
         """Дождаться, пока элемент станет кликабельным"""
         try:

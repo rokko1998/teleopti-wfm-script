@@ -26,14 +26,21 @@ class FormFiller:
                 return False
 
             try:
-                # Ищем поле периода отчета
+                # Ищем поле периода отчета с диагностикой
                 period_selector = self.form_elements.get_element_selector('period_dropdown')
-                period_field = self.iframe_handler.find_element_in_iframe(period_selector)
+                period_field = self.iframe_handler.find_element_with_diagnostics(period_selector)
 
                 if not period_field:
                     self.logger.error("❌ Поле периода отчета не найдено")
                     return False
-
+                
+                # Проверяем, что это SELECT элемент
+                if period_field.tag_name.lower() != 'select':
+                    self.logger.error(f"❌ Поле периода отчета не является SELECT элементом. Найден: {period_field.tag_name}")
+                    self.logger.info(f"   ID элемента: {period_field.get_attribute('id')}")
+                    self.logger.info(f"   Классы элемента: {period_field.get_attribute('class')}")
+                    return False
+                
                 # Получаем значение для периода
                 period_value = self.form_elements.get_period_value(period_name)
                 if not period_value:

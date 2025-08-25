@@ -4,15 +4,15 @@
 """
 
 class FormElements:
-    """Класс для определения элементов формы по data-parametername"""
+    """Класс для определения элементов формы по ID (на основе диагностики)"""
 
-    # Элементы формы по data-parametername (точный поиск)
+    # Элементы формы по ID (точный поиск на основе диагностики)
     ELEMENT_SELECTORS = {
-        'period_dropdown': '[data-parametername="Period"]',           # Период отчета
-        'start_date_field': '[data-parametername="StartDate"]',       # Дата начала
-        'end_date_field': '[data-parametername="FinishDate"]',        # Дата окончания
-        'reason_field': '[data-parametername="Reason"]',              # Причина обращения
-        'submit_button': 'input[type="submit"][value="Просмотр отчета"]',  # Кнопка отправки
+        'period_dropdown': '#ReportViewerControl_ctl04_ctl03_ddValue',           # Период отчета (SELECT)
+        'start_date_field': '#ReportViewerControl_ctl04_ctl05_txtValue',         # Дата начала (INPUT)
+        'end_date_field': '#ReportViewerControl_ctl04_ctl07_txtValue',           # Дата окончания (INPUT)
+        'reason_field': '#ReportViewerControl_ctl04_ctl09_txtValue',             # Причина обращения (INPUT)
+        'submit_button': '#ReportViewerControl_ctl04_ctl00',                     # Кнопка отправки (INPUT)
     }
 
     # Значения для периода отчета
