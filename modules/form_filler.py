@@ -290,8 +290,8 @@ class FormFiller:
 
                     # Ищем label с ТОЧНЫМ текстом (строго по названию) ВО ВСЕХ IFRAME
                     label_xpath = """//label[
-                        contains(., 'Интернет') and 
-                        contains(., 'Низкая скорость') and 
+                        contains(., 'Интернет') and
+                        contains(., 'Низкая скорость') and
                         contains(., '3G/4G')
                     ]"""
 
@@ -300,7 +300,11 @@ class FormFiller:
                     # Ищем во всех доступных iframe'ах
                     label = self._find_label_in_all_iframes(label_xpath)
                     if not label:
-                        raise Exception("Label не найден ни в одном iframe")
+                        # Если не найден в iframe'ах, ищем на всей странице
+                        self.logger.info("🔍 Label не найден в iframe'ах, ищем на всей странице...")
+                        label = self._find_label_on_page(label_xpath)
+                        if not label:
+                            raise Exception("Label не найден ни в iframe'ах, ни на странице")
 
                     # Дополнительная проверка - убеждаемся что это именно нужный label
                     label_text = label.text.strip()
@@ -513,6 +517,76 @@ class FormFiller:
                 self.driver.switch_to.default_content()
             except:
                 pass
+            return None
+
+    def _find_label_on_page(self, label_xpath):
+        """Найти label на всей странице (не только в iframe'ах)"""
+        try:
+            self.logger.info("🔍 Поиск label на всей странице...")
+            
+            # Возвращаемся в основной документ
+            self.iframe_handler.switch_to_main_document()
+            
+            # Ищем label на основной странице
+            try:
+                labels = self.driver.find_elements("xpath", label_xpath)
+                self.logger.info(f"📋 Найдено {len(labels)} label'ов на основной странице")
+                
+                for i, label in enumerate(labels):
+                    try:
+                        if label.is_displayed():
+                            label_text = label.text.strip()
+                            self.logger.info(f"✅ Label {i+1} на основной странице: '{label_text}'")
+                            
+                            # Проверяем что это нужный label
+                            if ("Интернет" in label_text or "Интернет" in label.get_attribute("innerHTML", "")) and \
+                               ("Низкая скорость" in label_text or "Низкая скорость" in label.get_attribute("innerHTML", "")) and \
+                               ("3G/4G" in label_text or "3G/4G" in label.get_attribute("innerHTML", "")):
+                                self.logger.info(f"🎯 Найден правильный label на основной странице!")
+                                return label
+                            else:
+                                self.logger.info(f"⚠️ Label {i+1} не подходит: '{label_text}'")
+                                # Дополнительная диагностика
+                                try:
+                                    inner_html = label.get_attribute("innerHTML", "")
+                                    self.logger.info(f"🔍 innerHTML: '{inner_html}'")
+                                except:
+                                    pass
+                    except Exception as e:
+                        self.logger.warning(f"⚠️ Ошибка при проверке label {i+1}: {e}")
+                        continue
+                
+            except Exception as e:
+                self.logger.warning(f"⚠️ Ошибка при поиске label'ов на странице: {e}")
+            
+            # Если не найден, пробуем искать по более простому селектору
+            self.logger.info("🔍 Пробуем простой поиск по тексту...")
+            try:
+                all_labels = self.driver.find_elements("tag name", "label")
+                self.logger.info(f"📋 Всего label'ов на странице: {len(all_labels)}")
+                
+                for i, label in enumerate(all_labels):
+                    try:
+                        if label.is_displayed():
+                            label_text = label.text.strip()
+                            if label_text and len(label_text) > 10:  # Только непустые и длинные
+                                self.logger.info(f"📝 Label {i+1}: '{label_text}'")
+                                
+                                # Проверяем на нужный текст
+                                if "Интернет" in label_text and "Низкая скорость" in label_text and "3G/4G" in label_text:
+                                    self.logger.info(f"🎯 Найден нужный label по простому поиску!")
+                                    return label
+                    except:
+                        continue
+                        
+            except Exception as e:
+                self.logger.warning(f"⚠️ Ошибка при простом поиске: {e}")
+            
+            self.logger.warning("⚠️ Label не найден ни на основной странице, ни по простому поиску")
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при поиске на странице: {e}")
             return None
 
     def submit_report(self):
