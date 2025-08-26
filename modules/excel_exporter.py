@@ -24,49 +24,35 @@ class ExcelExporter:
     def _disable_google_logs(self):
         """Отключить Google логи в консоли"""
         try:
-            # Устанавливаем переменные окружения для отключения логов
-            os.environ['WDM_LOG_LEVEL'] = '0'
-            os.environ['WDM_PRINT_FIRST_LINE'] = 'False'
-
             # Выполняем JavaScript для отключения console.log от Google
             js_code = """
-            // Отключаем Google логи
-            if (typeof console !== 'undefined') {
+            (function () {
                 const originalLog = console.log;
                 const originalWarn = console.warn;
                 const originalError = console.error;
 
-                console.log = function(...args) {
+                const isNoisy = (msg) =>
+                    msg.includes('google_apis') ||
+                    msg.includes('voice_transcription') ||
+                    msg.includes('AiaRequest') ||
+                    msg.includes('Registration response error') ||
+                    msg.includes('WARNING: All log messages');
+
+                console.log = function (...args) {
                     const message = args.join(' ');
-                    if (!message.includes('google_apis') &&
-                        !message.includes('voice_transcription') &&
-                        !message.includes('AiaRequest') &&
-                        !message.includes('Registration response error') &&
-                        !message.includes('WARNING: All log messages')) {
-                        originalLog.apply(console, args);
-                    }
+                    if (!isNoisy(message)) originalLog.apply(console, args);
                 };
 
-                console.warn = function(...args) {
+                console.warn = function (...args) {
                     const message = args.join(' ');
-                    if (!message.includes('google_apis') &&
-                        !message.includes('voice_transcription') &&
-                        !message.includes('AiaRequest') &&
-                        !message.includes('Registration response error')) {
-                        originalWarn.apply(console, args);
-                    }
+                    if (!isNoisy(message)) originalWarn.apply(console, args);
                 };
 
-                console.error = function(...args) {
+                console.error = function (...args) {
                     const message = args.join(' ');
-                    if (!message.includes('google_apis') &&
-                        !message.includes('voice_transcription') &&
-                        !message.includes('AiaRequest') &&
-                        !message.includes('Registration response error')) {
-                        originalError.apply(console, args);
-                    }
+                    if (!isNoisy(message)) originalError.apply(console, args);
                 };
-            }
+            })();
             """
             self.driver.execute_script(js_code)
             self.logger.info("🔇 Google логи отключены")
@@ -74,11 +60,11 @@ class ExcelExporter:
             self.logger.warning(f"⚠️ Не удалось отключить Google логи: {e}")
 
     def wait_for_report_ready(self, timeout=120):
-        """Дождаться готовности отчета с использованием Explicit Waits"""
+        """Дождаться готовности отчета через проверку по промежуткам"""
         try:
             self.logger.info("⏳ Ждем готовности отчета...")
 
-            # 1. Ждем полной загрузки страницы
+            # Сначала ждем полной загрузки страницы
             self.logger.info("⏳ Ждем полной загрузки страницы...")
             try:
                 WebDriverWait(self.driver, 30).until(
@@ -88,56 +74,45 @@ class ExcelExporter:
             except:
                 self.logger.warning("⚠️ Страница не загрузилась полностью, продолжаем...")
 
-            # 2. Ждем появления элементов экспорта через Explicit Wait
-            self.logger.info("⏳ Ждем появления элементов экспорта...")
-            try:
-                # Ждем появления ActiveLink элементов
-                WebDriverWait(self.driver, 30).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "a.ActiveLink"))
-                )
-                self.logger.info("✅ ActiveLink элементы найдены")
-            except:
-                self.logger.warning("⚠️ ActiveLink элементы не найдены, продолжаем...")
+            # Проверяем каждые 5 секунд в течение timeout
+            check_interval = 5
+            max_checks = timeout // check_interval
 
-            # 3. Ждем появления элементов с exportReport функциями
-            try:
-                WebDriverWait(self.driver, 30).until(
-                    lambda driver: len(driver.find_elements(By.CSS_SELECTOR, "a[onclick*='exportReport']")) > 0
-                )
-                self.logger.info("✅ Элементы с exportReport найдены")
-            except:
-                self.logger.warning("⚠️ Элементы с exportReport не найдены, продолжаем...")
+            for check_num in range(max_checks):
+                self.logger.info(f"🔍 Проверка {check_num + 1}/{max_checks} - ищем кнопку экспорта...")
 
-            # 4. Финальная проверка - ищем кнопку экспорта
-            self.logger.info("🔍 Выполняем финальную проверку...")
+                # Сначала пробуем найти по тексту (более надежно)
+                export_button = self.find_export_button_by_text()
+                if export_button:
+                    self.logger.info("✅ Кнопка экспорта найдена по тексту")
+                    self.logger.info("✅ Отчет готов к экспорту")
+                    return True
 
-            # Пробуем найти по тексту
-            export_button = self.find_export_button_by_text()
-            if export_button:
-                self.logger.info("✅ Кнопка экспорта найдена по тексту")
-                self.logger.info("✅ Отчет готов к экспорту")
-                return True
+                # Если не найдено по тексту, пробуем CSS селекторы
+                export_selectors = [
+                    "a[onclick*='exportReport']",
+                    "a[onclick*='EXCELOPENXML']",
+                    "a[class*='ActiveLink']",
+                    "div[id*='Export'] a",
+                    "div[class*='ToolbarExport'] a"
+                ]
 
-            # Пробуем CSS селекторы
-            export_selectors = [
-                "a[onclick*='exportReport']",
-                "a[onclick*='EXCELOPENXML']",
-                "a[class*='ActiveLink']",
-                "div[id*='Export'] a",
-                "div[class*='ToolbarExport'] a"
-            ]
+                for selector in export_selectors:
+                    try:
+                        export_button = self.driver.find_element(By.CSS_SELECTOR, selector)
+                        if export_button.is_enabled():  # Убрали проверку is_displayed()
+                            self.logger.info(f"✅ Кнопка экспорта найдена: {selector}")
+                            self.logger.info("✅ Отчет готов к экспорту")
+                            return True
+                    except:
+                        continue
 
-            for selector in export_selectors:
-                try:
-                    export_button = self.driver.find_element(By.CSS_SELECTOR, selector)
-                    if export_button.is_enabled():
-                        self.logger.info(f"✅ Кнопка экспорта найдена: {selector}")
-                        self.logger.info("✅ Отчет готов к экспорту")
-                        return True
-                except:
-                    continue
+                # Если кнопка не найдена, ждем и проверяем снова
+                if check_num < max_checks - 1:  # Не ждем после последней проверки
+                    self.logger.info(f"⏳ Кнопка экспорта не найдена, ждем {check_interval} секунд...")
+                    time.sleep(check_interval)
 
-            self.logger.error("❌ Кнопка экспорта не найдена после всех проверок")
+            self.logger.error(f"❌ Отчет не загрузился за {timeout} секунд")
             return False
 
         except Exception as e:
@@ -254,51 +229,35 @@ class ExcelExporter:
         try:
             self.logger.info("📤 Начинаем экспорт отчета в Excel...")
 
-            # 1. Сначала проверяем iframe и переключаемся в нужный контекст
-            self.logger.info("🔍 Проверяем iframe и контекст страницы...")
-            iframe_found = self.check_and_switch_iframe()
-
-            # 2. Ждем готовности отчета (после переключения в iframe)
+            # Ждем готовности отчета
             if not self.wait_for_report_ready(timeout=wait_time):
                 return False
 
-            # 3. Ждем появления ReportViewerControl через Explicit Wait
-            self.logger.info("⏳ Ждем появления ReportViewerControl...")
-            try:
-                WebDriverWait(self.driver, 30).until(
-                    lambda driver: driver.execute_script("return typeof $find !== 'undefined' && $find('ReportViewerControl') !== null")
-                )
-                self.logger.info("✅ ReportViewerControl найден")
-            except:
-                self.logger.warning("⚠️ ReportViewerControl не найден, продолжаем...")
+            # 1. Проверяем iframe и переключаемся в нужный контекст
+            self.logger.info("🔍 Проверяем iframe и контекст страницы...")
+            iframe_found = self.check_and_switch_iframe()
 
-            # 4. Показываем диагностику элементов экспорта
-            self.logger.info("🔍 Анализируем доступные элементы экспорта...")
-            export_elements = self.find_export_elements_via_js()
-
-            # 5. Пробуем прямой вызов API (приоритетный метод)
-            self.logger.info("🚀 Пробуем прямой вызов exportReport API...")
-            if self.call_export_report_api():
-                self.logger.info("✅ Экспорт в Excel запущен через API")
+            # 2. ПРИОРИТЕТ: Пробуем прямой вызов ReportViewer API (самый надежный способ)
+            self.logger.info("🚀 Пробуем прямой экспорт через ReportViewer API...")
+            if self.export_via_reportviewer("EXCELOPENXML"):
+                self.logger.info("✅ Экспорт в Excel запущен через ReportViewer API")
                 return True
 
-            # 6. Если API не сработал, пробуем JavaScript клик
-            self.logger.info("🔄 Пробуем JavaScript клик...")
-            if self.click_excel_export_via_js():
-                self.logger.info("✅ Экспорт в Excel запущен через JavaScript")
+            # 3. Альтернатива: клик по меню Excel
+            self.logger.info("🔄 Пробуем клик по меню Excel...")
+            if self.click_excel_menu_item():
+                self.logger.info("✅ Экспорт в Excel запущен через меню")
                 return True
 
-            # 7. Если JavaScript не сработал, используем стандартный подход
-            self.logger.info("🔄 Используем стандартный подход через Selenium...")
-
-            # Ищем кнопку экспорта через обновленный метод
+            # 4. Fallback: старый метод через поиск кнопки
+            self.logger.info("🔄 Используем fallback метод...")
             export_button = self.find_export_button_by_text()
             if not export_button:
                 self.logger.error("❌ Кнопка экспорта не найдена всеми методами")
                 return False
 
             # Кликаем по кнопке экспорта
-            self.logger.info("💾 Нажимаем кнопку экспорта через Selenium...")
+            self.logger.info("💾 Нажимаем кнопку экспорта...")
             try:
                 export_button.click()
             except Exception as click_error:
@@ -347,118 +306,102 @@ class ExcelExporter:
             self.logger.info(f"   • Ready State: {context_info.get('readyState', 'Нет')}")
             self.logger.info(f"   • Iframe count: {context_info.get('iframeCount', 0)}")
 
-            # Улучшенный JavaScript код для поиска Excel кнопки
+            # Исправленный JavaScript код для поиска Excel кнопки
             js_code = """
-            console.log('=== ДЕТАЛЬНЫЙ ПОИСК EXCEL КНОПКИ ===');
+            (function () {
+                const results = {
+                    found: false,
+                    method: 'none',
+                    details: {},
+                    allLinks: [],
+                    exportElements: []
+                };
 
-            const results = {
-                found: false,
-                method: 'none',
-                details: {},
-                allLinks: [],
-                exportElements: []
-            };
+                // 1. Находим Excel среди ActiveLink
+                const activeLinks = Array.from(document.querySelectorAll('a.ActiveLink'));
+                const excelLink = activeLinks.find(el => (el.textContent || '').includes('Excel'));
 
-            // 1. Поиск по ActiveLink классу (исправленный селектор)
-            console.log('1. Поиск по ActiveLink...');
-            const activeLinks = document.querySelectorAll('a.ActiveLink');
-            console.log('Найдено ActiveLink элементов:', activeLinks.length);
-
-            for (let i = 0; i < activeLinks.length; i++) {
-                const link = activeLinks[i];
-                const text = link.textContent.trim();
-                console.log(`ActiveLink ${i+1}: "${text}"`);
-
-                if (text.includes('Excel') || text.includes('excel')) {
+                if (excelLink) {
                     console.log('✅ Excel найден в ActiveLink!');
                     results.found = true;
                     results.method = 'ActiveLink';
-                    results.details = {
-                        element: link,
-                        text: text,
-                        className: link.className,
-                        onclick: link.onclick ? link.onclick.toString() : null,
-                        isVisible: link.offsetParent !== null &&
-                                  link.style.display !== 'none' &&
-                                  link.style.visibility !== 'hidden'
-                    };
-                    break;
-                }
-            }
-
-            // 2. Поиск по exportReport функциям
-            if (!results.found) {
-                console.log('2. Поиск по exportReport...');
-                const allElements = document.querySelectorAll('*');
-                console.log('Всего элементов на странице:', allElements.length);
-
-                const exportElements = Array.from(allElements).filter(el => {
-                    const onclick = el.onclick ? el.onclick.toString() : '';
-                    return onclick.includes('exportReport');
-                });
-
-                console.log('Элементы с exportReport:', exportElements.length);
-                results.exportElements = exportElements.map((el, i) => ({
-                    index: i + 1,
-                    tag: el.tagName,
-                    text: el.textContent.trim(),
-                    onclick: el.onclick.toString(),
-                    className: el.className
-                }));
-
-                const excelElement = exportElements.find(el => {
-                    const text = el.textContent.toLowerCase();
-                    return text.includes('excel') || text.includes('экспорт');
-                });
-
-                if (excelElement) {
-                    console.log('✅ Excel найден по exportReport!');
-                    results.found = true;
-                    results.method = 'exportReport';
-                    results.details = {
-                        element: excelElement,
-                        text: excelElement.textContent.trim(),
-                        className: excelElement.className,
-                        onclick: excelElement.onclick.toString(),
-                        isVisible: excelElement.offsetParent !== null
-                    };
-                }
-            }
-
-            // 3. Поиск по тексту во всех ссылках
-            if (!results.found) {
-                console.log('3. Поиск по тексту во всех ссылках...');
-                const allLinks = document.querySelectorAll('a');
-                console.log('Всего ссылок на странице:', allLinks.length);
-
-                results.allLinks = Array.from(allLinks).map((link, i) => ({
-                    index: i + 1,
-                    text: link.textContent.trim(),
-                    className: link.className,
-                    onclick: link.onclick ? link.onclick.toString() : null
-                }));
-
-                const excelLink = Array.from(allLinks).find(link => {
-                    const text = link.textContent.toLowerCase();
-                    return text.includes('excel') || text.includes('экспорт');
-                });
-
-                if (excelLink) {
-                    console.log('✅ Excel найден по тексту!');
-                    results.found = true;
-                    results.method = 'text_search';
                     results.details = {
                         element: excelLink,
                         text: excelLink.textContent.trim(),
                         className: excelLink.className,
                         onclick: excelLink.onclick ? excelLink.onclick.toString() : null,
-                        isVisible: excelLink.offsetParent !== null
+                        isVisible: excelLink.offsetParent !== null &&
+                                  excelLink.style.display !== 'none' &&
+                                  excelLink.style.visibility !== 'hidden'
                     };
                 }
-            }
 
-            console.log('Результат поиска:', results);
-            return results;
+                // 2. Собираем все элементы, у кого onclick содержит exportReport
+                if (!results.found) {
+                    const allElements = Array.from(document.querySelectorAll('*'));
+                    const exportElements = allElements.filter(el => {
+                        const onclick = el.onclick ? el.onclick.toString() : '';
+                        return onclick.includes('exportReport');
+                    });
+
+                    results.exportElements = exportElements.map((el, i) => ({
+                        index: i + 1,
+                        tag: el.tagName,
+                        text: (el.textContent || '').trim(),
+                        onclick: el.onclick.toString(),
+                        className: el.className
+                    }));
+
+                    const excelElement = exportElements.find(el => {
+                        const text = (el.textContent || '').toLowerCase();
+                        return text.includes('excel') || text.includes('экспорт');
+                    });
+
+                    if (excelElement) {
+                        console.log('✅ Excel найден по exportReport!');
+                        results.found = true;
+                        results.method = 'exportReport';
+                        results.details = {
+                            element: excelElement,
+                            text: excelElement.textContent.trim(),
+                            className: excelElement.className,
+                            onclick: excelElement.onclick.toString(),
+                            isVisible: excelElement.offsetParent !== null
+                        };
+                    }
+                }
+
+                // 3. Поиск по тексту во всех ссылках
+                if (!results.found) {
+                    const allLinks = Array.from(document.querySelectorAll('a'));
+                    results.allLinks = allLinks.map((link, i) => ({
+                        index: i + 1,
+                        text: (link.textContent || '').trim(),
+                        className: link.className,
+                        onclick: link.onclick ? link.onclick.toString() : null
+                    }));
+
+                    const excelLink = allLinks.find(link => {
+                        const text = (link.textContent || '').toLowerCase();
+                        return text.includes('excel') || text.includes('экспорт');
+                    });
+
+                    if (excelLink) {
+                        console.log('✅ Excel найден по тексту!');
+                        results.found = true;
+                        results.method = 'text_search';
+                        results.details = {
+                            element: excelLink,
+                            text: excelLink.textContent.trim(),
+                            className: excelLink.className,
+                            onclick: excelLink.onclick ? excelLink.onclick.toString() : null,
+                            isVisible: excelLink.offsetParent !== null
+                        };
+                    }
+                }
+
+                return results;
+            })();
             """
 
             # Выполняем JavaScript
@@ -503,65 +446,97 @@ class ExcelExporter:
             self.logger.error(f"❌ Ошибка при поиске через JavaScript: {e}")
             return None
 
-    def call_export_report_api(self):
-        """Прямой вызов exportReport API (приоритетный метод)"""
+    def export_via_reportviewer(self, format_code: str = "EXCELOPENXML", timeout: int = 120) -> bool:
+        """
+        Самый надежный способ: вызвать JS: $find('ReportViewerControl').exportReport('<FORMAT>')
+        """
         try:
-            self.logger.info("🚀 Пытаемся вызвать exportReport API напрямую...")
+            self.logger.info(f"🚀 Прямой экспорт через ReportViewer API: {format_code}")
 
-            # Проверяем доступность ReportViewerControl
-            api_check = self.driver.execute_script("""
-                try {
-                    if (typeof $find !== 'undefined') {
-                        const control = $find('ReportViewerControl');
-                        if (control && typeof control.exportReport === 'function') {
-                            return {
-                                available: true,
-                                controlType: control.constructor.name,
-                                methods: Object.getOwnPropertyNames(control).filter(name =>
-                                    typeof control[name] === 'function'
-                                )
-                            };
-                        }
-                    }
-                    return { available: false, reason: 'ReportViewerControl не найден или exportReport недоступен' };
-                } catch (e) {
-                    return { available: false, reason: e.message };
-                }
-            """)
+            # Обязательно проверяем iframe до JS
+            self.check_and_switch_iframe()
 
-            if not api_check.get('available'):
-                self.logger.warning(f"⚠️ API недоступен: {api_check.get('reason', 'Неизвестная причина')}")
+            # Ждём, пока загрузятся Sys.Application и сам ReportViewer
+            self.logger.info("⏳ Ждем загрузки Sys.Application...")
+            try:
+                WebDriverWait(self.driver, 30).until(
+                    lambda d: d.execute_script("return !!(window.Sys && Sys.Application);")
+                )
+                self.logger.info("✅ Sys.Application загружен")
+            except:
+                self.logger.warning("⚠️ Sys.Application не загрузился, пробуем продолжить...")
+
+            self.logger.info("⏳ Ждем загрузки ReportViewerControl...")
+            try:
+                WebDriverWait(self.driver, 30).until(
+                    lambda d: d.execute_script("return !!(window.$find && $find('ReportViewerControl'));")
+                )
+                self.logger.info("✅ ReportViewerControl загружен")
+            except:
+                self.logger.error("❌ ReportViewerControl не найден")
                 return False
 
-            self.logger.info(f"✅ API доступен: {api_check.get('controlType', 'Неизвестно')}")
-            if api_check.get('methods'):
-                self.logger.info(f"📋 Доступные методы: {', '.join(api_check['methods'][:10])}")
+            # Запускаем экспорт
+            self.logger.info(f"💾 Запускаем экспорт в формате {format_code}...")
+            self.driver.execute_script(
+                "$find('ReportViewerControl').exportReport(arguments[0]);",
+                format_code
+            )
 
-            # Пытаемся вызвать exportReport
-            export_result = self.driver.execute_script("""
-                try {
-                    const control = $find('ReportViewerControl');
-                    if (control && control.exportReport) {
-                        // Сначала пробуем EXCELOPENXML
-                        control.exportReport('EXCELOPENXML');
-                        return { success: true, format: 'EXCELOPENXML', method: 'direct_api_call' };
-                    }
-                } catch (e) {
-                    return { success: false, error: e.message, method: 'direct_api_call' };
-                }
-                return { success: false, error: 'exportReport метод недоступен' };
-            """)
+            self.logger.info("✅ Экспорт запущен через ReportViewer API")
+            return True
 
-            if export_result and export_result.get('success'):
-                self.logger.info(f"✅ Экспорт запущен через API: {export_result.get('format', 'Неизвестно')}")
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при экспорте через ReportViewer API: {e}")
+            return False
+
+    def click_excel_menu_item(self) -> bool:
+        """Клик по пункту меню Excel (альтернативный способ)"""
+        try:
+            self.logger.info("🖱️ Пытаемся кликнуть по пункту меню Excel...")
+
+            self.check_and_switch_iframe()
+
+            # Раскрываем меню экспорта (нужен реальный локатор кнопки/иконки «Export» в тулбаре)
+            try:
+                export_toggle = WebDriverWait(self.driver, 10).until(
+                    EC.element_to_be_clickable((
+                        By.XPATH,
+                        "//*[contains(@title,'Export') or contains(@aria-label,'Export') or .='Export']"
+                    ))
+                )
+                export_toggle.click()
+                self.logger.info("✅ Меню экспорта раскрыто")
+            except:
+                self.logger.warning("⚠️ Не удалось найти кнопку раскрытия меню экспорта")
+                return False
+
+            # Ждём появления видимого пункта Excel
+            def _find_excel_link(drv):
+                links = drv.find_elements(By.CSS_SELECTOR, "a.ActiveLink")
+                for el in links:
+                    try:
+                        if "Excel" in (el.text or el.get_attribute("textContent") or "") and el.is_enabled():
+                            return el
+                    except Exception:
+                        continue
+                return False
+
+            try:
+                excel_link = WebDriverWait(self.driver, 10).until(_find_excel_link)
+                self.logger.info("✅ Excel ссылка найдена в меню")
+
+                # Используем JavaScript клик для надежности
+                self.driver.execute_script("arguments[0].click();", excel_link)
+                self.logger.info("✅ Excel экспорт запущен через клик по меню")
                 return True
-            else:
-                error = export_result.get('error', 'Неизвестная ошибка') if export_result else 'Нет результата'
-                self.logger.warning(f"⚠️ API вызов не удался: {error}")
+
+            except:
+                self.logger.error("❌ Excel ссылка не появилась в меню")
                 return False
 
         except Exception as e:
-            self.logger.error(f"❌ Ошибка при вызове API: {e}")
+            self.logger.error(f"❌ Ошибка при клике по меню Excel: {e}")
             return False
 
     def check_and_switch_iframe(self):
@@ -592,9 +567,7 @@ class ExcelExporter:
                             url: window.location.href,
                             hasExportElements: document.querySelectorAll('a[onclick*="exportReport"]').length > 0,
                             hasActiveLinks: document.querySelectorAll('a.ActiveLink').length > 0,
-                            hasExcelText: Array.from(document.querySelectorAll('a')).some(el =>
-                                el.textContent.includes('Excel') || el.textContent.includes('excel')
-                            )
+                            hasExcelText: document.querySelector('a:contains("Excel")') !== null
                         };
                     """)
 
@@ -669,76 +642,61 @@ class ExcelExporter:
             return []
 
     def click_excel_export_via_js(self):
-        """Нажать на Excel экспорт через JavaScript (исправленная версия)"""
+        """Нажать на Excel экспорт через JavaScript"""
         try:
             self.logger.info("🖱️ Пытаемся нажать Excel экспорт через JavaScript...")
 
             js_code = """
-            // 1. Находим Excel кнопку (исправленный селектор)
-            const excelLink = Array.from(document.querySelectorAll('a.ActiveLink')).find(el =>
-                el.textContent.includes('Excel') || el.textContent.includes('excel')
-            );
+            (function () {
+                // 1. Находим Excel кнопку среди ActiveLink
+                const activeLinks = Array.from(document.querySelectorAll('a.ActiveLink'));
+                const excelLink = activeLinks.find(el => (el.textContent || '').includes('Excel'));
 
-            if (excelLink) {
-                try {
-                    // Проверяем, нужно ли сначала раскрыть меню
-                    const parentMenu = excelLink.closest('[class*="Menu"], [class*="dropdown"], [class*="MenuBar"]');
-                    if (parentMenu && parentMenu.style.display === 'none') {
-                        // Ищем кнопку для раскрытия меню
-                        const menuToggle = document.querySelector('[onclick*="toggle"], [onclick*="show"], [onclick*="open"]');
-                        if (menuToggle) {
-                            menuToggle.click();
-                            // Ждем появления меню
-                            setTimeout(() => {
-                                excelLink.click();
-                            }, 500);
-                            return { success: true, method: 'ActiveLink_with_menu_toggle', text: excelLink.textContent };
+                if (excelLink) {
+                    try {
+                        excelLink.click();
+                        return { success: true, method: 'ActiveLink', text: excelLink.textContent };
+                    } catch (e) {
+                        return { success: false, error: e.message, method: 'ActiveLink' };
+                    }
+                }
+
+                // 2. Альтернативный способ - поиск по exportReport
+                const exportElements = Array.from(document.querySelectorAll('*')).filter(el => {
+                    const onclick = el.onclick ? el.onclick.toString() : '';
+                    return onclick.includes('exportReport') && onclick.includes('EXCELOPENXML');
+                });
+
+                if (exportElements.length > 0) {
+                    const excelElement = exportElements.find(el =>
+                        (el.textContent || '').includes('Excel') || (el.textContent || '').includes('excel')
+                    );
+
+                    if (excelElement) {
+                        try {
+                            excelElement.click();
+                            return { success: true, method: 'exportReport', text: excelElement.textContent };
+                        } catch (e) {
+                            return { success: false, error: e.message, method: 'exportReport' };
                         }
                     }
+                }
 
-                    // Обычный клик
-                    excelLink.click();
-                    return { success: true, method: 'ActiveLink', text: excelLink.textContent };
+                // 3. Прямой вызов exportReport, если есть доступ к ReportViewerControl
+                try {
+                    if (typeof $find !== 'undefined') {
+                        const control = $find('ReportViewerControl');
+                        if (control && control.exportReport) {
+                            control.exportReport('EXCELOPENXML');
+                            return { success: true, method: 'direct_call' };
+                        }
+                    }
                 } catch (e) {
-                    return { success: false, error: e.message, method: 'ActiveLink' };
+                    // Игнорируем ошибку, пробуем другие способы
                 }
-            }
 
-            // 2. Альтернативный способ - поиск по exportReport
-            const exportElements = Array.from(document.querySelectorAll('*')).filter(el => {
-                const onclick = el.onclick ? el.onclick.toString() : '';
-                return onclick.includes('exportReport') && onclick.includes('EXCELOPENXML');
-            });
-
-            if (exportElements.length > 0) {
-                const excelElement = exportElements.find(el =>
-                    el.textContent.includes('Excel') || el.textContent.includes('excel')
-                );
-
-                if (excelElement) {
-                    try {
-                        excelElement.click();
-                        return { success: true, method: 'exportReport', text: excelElement.textContent };
-                    } catch (e) {
-                        return { success: false, error: e.message, method: 'exportReport' };
-                    }
-                }
-            }
-
-            // 3. Прямой вызов exportReport, если есть доступ к ReportViewerControl
-            try {
-                if (typeof $find !== 'undefined') {
-                    const control = $find('ReportViewerControl');
-                    if (control && control.exportReport) {
-                        control.exportReport('EXCELOPENXML');
-                        return { success: true, method: 'direct_call' };
-                    }
-                }
-            } catch (e) {
-                // Игнорируем ошибку, пробуем другие способы
-            }
-
-            return { success: false, error: 'Excel кнопка не найдена' };
+                return { success: false, error: 'Excel кнопка не найдена' };
+            })();
             """
 
             result = self.driver.execute_script(js_code)
@@ -808,52 +766,52 @@ class ExcelExporter:
 
             # Выполняем тот же JavaScript код, что и в вашем тесте
             js_test_code = """
-            console.log('=== ТЕСТИРОВАНИЕ EXCEL ЭКСПОРТА ===');
+            (function () {
+                // 1. Находим Excel кнопку среди ActiveLink
+                const activeLinks = Array.from(document.querySelectorAll('a.ActiveLink'));
+                const excelLink = activeLinks.find(el => (el.textContent || '').includes('Excel'));
 
-            // 1. Находим Excel кнопку
-            const excelLink = document.querySelector('a.ActiveLink[text="Excel"]') ||
-                              Array.from(document.querySelectorAll('a.ActiveLink')).find(el => el.textContent.includes('Excel'));
-
-            const result = {
-                excelLinkFound: !!excelLink,
-                excelLinkInfo: null,
-                parentDropdown: null,
-                isVisible: false,
-                clickResult: null,
-                exportElements: []
-            };
-
-            if (excelLink) {
-                result.excelLinkInfo = {
-                    text: excelLink.textContent,
-                    className: excelLink.className,
-                    onclick: excelLink.onclick ? excelLink.onclick.toString() : null,
-                    style: excelLink.style.cssText
+                const result = {
+                    excelLinkFound: !!excelLink,
+                    excelLinkInfo: null,
+                    parentDropdown: null,
+                    isVisible: false,
+                    clickResult: null,
+                    exportElements: []
                 };
 
-                // Проверяем родительский dropdown
-                result.parentDropdown = excelLink.closest('[class*="Menu"], [class*="dropdown"], [class*="MenuBar"]');
+                if (excelLink) {
+                    result.excelLinkInfo = {
+                        text: excelLink.textContent,
+                        className: excelLink.className,
+                        onclick: excelLink.onclick ? excelLink.onclick.toString() : null,
+                        style: excelLink.style.cssText
+                    };
 
-                // Проверяем видимость
-                result.isVisible = excelLink.offsetParent !== null &&
-                                 excelLink.style.display !== 'none' &&
-                                 excelLink.style.visibility !== 'hidden';
-            }
+                    // Проверяем родительский dropdown
+                    result.parentDropdown = excelLink.closest('[class*="Menu"], [class*="dropdown"], [class*="MenuBar"]');
 
-            // Ищем все элементы с exportReport
-            const exportElements = Array.from(document.querySelectorAll('*')).filter(el => {
-                const onclick = el.onclick ? el.onclick.toString() : '';
-                return onclick.includes('exportReport');
-            });
+                    // Проверяем видимость
+                    result.isVisible = excelLink.offsetParent !== null &&
+                                     excelLink.style.display !== 'none' &&
+                                     excelLink.style.visibility !== 'hidden';
+                }
 
-            result.exportElements = exportElements.map((el, i) => ({
-                index: i + 1,
-                tag: el.tagName,
-                text: el.textContent.trim(),
-                onclick: el.onclick.toString()
-            }));
+                // Ищем все элементы с exportReport
+                const exportElements = Array.from(document.querySelectorAll('*')).filter(el => {
+                    const onclick = el.onclick ? el.onclick.toString() : '';
+                    return onclick.includes('exportReport');
+                });
 
-            return result;
+                result.exportElements = exportElements.map((el, i) => ({
+                    index: i + 1,
+                    tag: el.tagName,
+                    text: (el.textContent || '').trim(),
+                    onclick: el.onclick.toString()
+                }));
+
+                return result;
+            })();
             """
 
             test_result = self.driver.execute_script(js_test_code)
