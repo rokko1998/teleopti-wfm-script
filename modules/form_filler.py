@@ -256,12 +256,14 @@ class FormFiller:
                 # Ждем применения изменений
                 time.sleep(1)
 
-                                # 3. Теперь выбираем нужный чекбокс (пробуем label, затем fallback)
+                                                # 3. Теперь выбираем нужный чекбокс (пробуем label, затем fallback)
                 self.logger.info("🔍 Ищем чекбокс 'Низкая скорость в 3G/4G'...")
 
                 # Пробуем найти по label тексту (тихо, без ошибок в логах)
                 checkbox = None
                 try:
+                    self.logger.info("🔍 Попытка 1: поиск по точному тексту label...")
+                    
                     # Ищем label с ТОЧНЫМ текстом (строго по названию) В IFRAME
                     label_xpath = """//label[
                         normalize-space(text()) = 'Интернет >> Низкая скорость в 3G/4G' or
@@ -269,7 +271,9 @@ class FormFiller:
                         normalize-space(text()) = 'Интернет&nbsp;&gt;&gt;&nbsp;Низкая&nbsp;скорость&nbsp;в&nbsp;3G/4G' or
                         normalize-space(.) = 'Интернет&nbsp;&gt;&gt;&nbsp;Низкая&nbsp;скорость&nbsp;в&nbsp;3G/4G'
                     ]"""
-
+                    
+                    self.logger.info(f"🔍 XPath для поиска: {label_xpath}")
+                    
                     # Ищем через iframe_handler, а не через driver напрямую
                     label = self.iframe_handler.find_element_in_iframe(("xpath", label_xpath))
                     if not label:
@@ -296,9 +300,9 @@ class FormFiller:
                         self.logger.warning(f"⚠️ Найден label не подходит: '{label_text}'")
                         raise Exception("Label не содержит нужный текст")
 
-                except Exception:
-                    # Тихий fallback без ошибок в логах
-                    pass
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Попытка 1 не удалась: {e}")
+                    self.logger.info("🔄 Переходим к fallback механизму...")
 
                     # Fallback: используем старый метод
                     checkbox_selector = self.form_elements.get_dropdown_selector('reason_checkbox')
@@ -311,6 +315,7 @@ class FormFiller:
                                 # Ищем label для этого чекбокса
                                 checkbox_id = checkbox.get_attribute("id")
                                 if checkbox_id:
+                                    self.logger.info(f"🔍 Fallback: найден чекбокс с ID '{checkbox_id}', ищем label...")
                                     label = self.iframe_handler.find_element_in_iframe(
                                         ("xpath", f"//label[@for='{checkbox_id}']")
                                     )
@@ -321,6 +326,7 @@ class FormFiller:
                                             self.logger.info("✅ Это правильный чекбокс!")
                                         else:
                                             self.logger.warning(f"⚠️ Fallback нашел неправильный чекбокс: '{label_text}'")
+                                            self.logger.warning("⚠️ Ожидалось: 'Интернет >> Низкая скорость в 3G/4G'")
                                             checkbox = None
                                     else:
                                         self.logger.info(f"✅ Fallback: найден чекбокс с ID '{checkbox_id}' (без label)")

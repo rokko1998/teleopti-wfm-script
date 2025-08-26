@@ -21,7 +21,7 @@ class SeleniumExportHandler:
     def __init__(self, driver, logger_instance, download_dir=None):
         self.driver = driver
         self.logger = logger_instance
-        
+
         # Используем папку проекта по умолчанию, а не Windows Downloads
         if download_dir:
             self.download_dir = Path(download_dir)
@@ -29,7 +29,7 @@ class SeleniumExportHandler:
             # Папка downloads в корне проекта
             project_root = Path(__file__).resolve().parent.parent
             self.download_dir = project_root / "downloads"
-        
+
         # Создаем директорию для загрузок если её нет
         self.download_dir.mkdir(parents=True, exist_ok=True)
         self.logger.info(f"📁 Директория загрузок: {self.download_dir}")

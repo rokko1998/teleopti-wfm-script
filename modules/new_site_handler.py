@@ -70,23 +70,25 @@ class NewSiteHandler:
             self.logger.info("📤 Пробуем экспорт через 'боевой' сценарий...")
             excel_result = self.export_excel_by_click(wait_time=wait_time)
 
-            if excel_result and isinstance(excel_result, str) and excel_result.endswith('.xlsx'):
-                self.logger.info(f"✅ Экспорт через 'боевой' сценарий успешен: {excel_result}")
-                # Файл скачался, останавливаемся здесь
-                return True
-            else:
-                self.logger.warning("⚠️ 'Боевой' сценарий не сработал")
-
-                # Проверяем что именно произошло
-                if excel_result is None:
-                    self.logger.error("❌ Экспорт не удался - файл не появился")
-                    return False
-                elif excel_result is False:
-                    self.logger.error("❌ Экспорт не удался - ошибка в процессе")
-                    return False
+            # Проверяем результат экспорта
+            if excel_result and isinstance(excel_result, str):
+                # Нормализуем путь для проверки расширения
+                file_path = Path(excel_result)
+                if file_path.suffix.lower() == '.xlsx':
+                    self.logger.info(f"✅ Экспорт через 'боевой' сценарий успешен: {excel_result}")
+                    # Файл скачался, останавливаемся здесь
+                    return True
                 else:
-                    self.logger.warning(f"⚠️ Неожиданный результат: {excel_result}")
-                    return False
+                    self.logger.warning(f"⚠️ Результат не является Excel файлом: {excel_result}")
+            elif excel_result is None:
+                self.logger.error("❌ Экспорт не удался - файл не появился")
+                return False
+            elif excel_result is False:
+                self.logger.error("❌ Экспорт не удался - ошибка в процессе")
+                return False
+            else:
+                self.logger.warning(f"⚠️ Неожиданный тип результата: {type(excel_result)} = {excel_result}")
+                return False
 
             self.logger.info("🎉 Обработка отчета завершена успешно!")
             return True
