@@ -18,7 +18,7 @@ class FormFiller:
         "xpath",
         "//div[starts-with(@id,'ReportViewerControl_') and contains(@id,'_divDropDown')]"
     )
-    
+
     # NBSP -> пробел и поиск по частям текста
     LABEL_XPATH = (
         ".//label["
@@ -298,17 +298,89 @@ class FormFiller:
                 time.sleep(2)
                 self.logger.info("✅ Готовы к выбору чекбокса")
 
-                # 3. ⚠️ ВАЖНЫЙ ПЕРЕХОД из iframe в корень, дальше ищем не в iframe
-                self.logger.info("🔄 Переходим в корень страницы для поиска label в dropdown...")
-
-                # Если после "Выделить все" dropdown закрылся — переоткроем
-                select_ok = self.select_reason_label("#ReportViewerControl_ctl04_ctl23_divDropDown_ctl00")
-                if not select_ok:
-                    self.logger.error("❌ Label 'Интернет >> Низкая скорость в 3G/4G' не найден внутри dropdown")
+                                # 3. Ищем нужный label сразу в открытом dropdown (не переходя в корень)
+                self.logger.info("🔍 Ищем нужный label в открытом dropdown...")
+                
+                try:
+                    # Ищем label с нужным текстом в текущем iframe
+                    label_xpath = """//label[
+                        contains(., 'Интернет') and 
+                        contains(., 'Низкая скорость') and 
+                        contains(., '3G/4G')
+                    ]"""
+                    
+                    self.logger.info(f"🔍 XPath для поиска: {label_xpath}")
+                    
+                    # Ищем label в текущем iframe
+                    label = self.iframe_handler.find_element_in_iframe(("xpath", label_xpath))
+                    if not label:
+                        raise Exception("Label не найден в текущем iframe")
+                    
+                    self.logger.info("✅ Label найден в текущем iframe")
+                    
+                    # Дополнительная проверка - убеждаемся что это именно нужный label
+                    label_text = label.text.strip()
+                    if "Интернет" in label_text and "Низкая скорость" in label_text and "3G/4G" in label_text:
+                        self.logger.info(f"✅ Найден правильный label: '{label_text}'")
+                        
+                        # Получаем for атрибут и ищем соответствующий input
+                        for_attr = label.get_attribute("for")
+                        if for_attr:
+                            checkbox = self.iframe_handler.find_element_in_iframe(("id", for_attr))
+                            if checkbox:
+                                self.logger.info(f"✅ Чекбокс найден по label с for='{for_attr}'")
+                            else:
+                                raise Exception("Чекбокс не найден по for атрибуту")
+                        else:
+                            # Если нет for, ищем input рядом с label
+                            checkbox = label.find_element("xpath", "./following-sibling::input[@type='checkbox']")
+                            self.logger.info("✅ Чекбокс найден рядом с label")
+                    else:
+                        self.logger.warning(f"⚠️ Найден label не подходит: '{label_text}'")
+                        raise Exception("Label не содержит нужный текст")
+                    
+                    # Проверяем, не выбран ли уже чекбокс
+                    if not checkbox.is_selected():
+                        self.logger.info("✅ Выбираем чекбокс 'Низкая скорость в 3G/4G'...")
+                        
+                        # Проверяем что нет блокирующих модальных окон
+                        try:
+                            blocking_modal = self.driver.find_element("xpath",
+                                "//div[contains(@class, 'modal') and contains(@class, 'in') and @style*='display: block']")
+                            if blocking_modal.is_displayed():
+                                self.logger.warning("⚠️ Обнаружено блокирующее модальное окно, ждем исчезновения...")
+                                time.sleep(3)  # Ждем исчезновения
+                        except:
+                            # Модальное окно не найдено - можно кликать
+                            pass
+                        
+                        # Пробуем клик с проверкой на блокировку
+                        try:
+                            checkbox.click()
+                            self.logger.info("✅ Чекбокс успешно выбран")
+                        except Exception as click_error:
+                            if "element click intercepted" in str(click_error):
+                                self.logger.warning("⚠️ Клик заблокирован, пробуем JavaScript клик...")
+                                try:
+                                    self.driver.execute_script("arguments[0].click();", checkbox)
+                                    self.logger.info("✅ Чекбокс выбран через JavaScript")
+                                except Exception as js_error:
+                                    self.logger.error(f"❌ JavaScript клик тоже не удался: {js_error}")
+                                    raise js_error
+                            else:
+                                raise click_error
+                    else:
+                        self.logger.info("✅ Чекбокс 'Низкая скорость в 3G/4G' уже выбран")
+                    
+                    # Ждем применения выбора
+                    time.sleep(1)
+                    
+                    self.logger.info("✅ Причина обращения установлена: Низкая скорость в 3G/4G")
+                    return True
+                    
+                except Exception as e:
+                    self.logger.error(f"❌ Не удалось найти или выбрать label: {e}")
                     return False
-
-                self.logger.info("✅ Причина обращения установлена: Низкая скорость в 3G/4G")
-                return True
 
             finally:
                 # Возвращаемся в основной документ
