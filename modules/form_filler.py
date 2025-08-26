@@ -287,17 +287,16 @@ class FormFiller:
                 checkbox = None
                 try:
                     self.logger.info("🔍 Попытка 1: поиск по точному тексту label во всех iframe...")
-                    
+
                     # Ищем label с ТОЧНЫМ текстом (строго по названию) ВО ВСЕХ IFRAME
                     label_xpath = """//label[
-                        normalize-space(text()) = 'Интернет >> Низкая скорость в 3G/4G' or
-                        normalize-space(.) = 'Интернет >> Низкая скорость в 3G/4G' or
-                        normalize-space(text()) = 'Интернет&nbsp;&gt;&gt;&nbsp;Низкая&nbsp;скорость&nbsp;в&nbsp;3G/4G' or
-                        normalize-space(.) = 'Интернет&nbsp;&gt;&gt;&nbsp;Низкая&nbsp;скорость&nbsp;в&nbsp;3G/4G'
+                        contains(., 'Интернет') and 
+                        contains(., 'Низкая скорость') and 
+                        contains(., '3G/4G')
                     ]"""
-                    
+
                     self.logger.info(f"🔍 XPath для поиска: {label_xpath}")
-                    
+
                     # Ищем во всех доступных iframe'ах
                     label = self._find_label_in_all_iframes(label_xpath)
                     if not label:
@@ -452,41 +451,49 @@ class FormFiller:
         """Найти label во всех доступных iframe'ах"""
         try:
             self.logger.info("🔍 Поиск label во всех iframe'ах...")
-            
+
             # Возвращаемся в основной документ для поиска всех iframe'ов
             self.iframe_handler.switch_to_main_document()
-            
+
             # Ищем все iframe'ы на странице
             iframes = self.driver.find_elements("tag name", "iframe")
             self.logger.info(f"📋 Найдено {len(iframes)} iframe'ов на странице")
-            
+
             for i, iframe in enumerate(iframes):
                 try:
                     self.logger.info(f"🔍 Проверяем iframe {i+1}/{len(iframes)}...")
-                    
+
                     # Переключаемся на iframe
                     self.driver.switch_to.frame(iframe)
-                    
+
                     # Ищем label в текущем iframe
                     try:
                         label = self.driver.find_element("xpath", label_xpath)
                         if label and label.is_displayed():
                             label_text = label.text.strip()
                             self.logger.info(f"✅ Label найден в iframe {i+1}: '{label_text}'")
-                            
-                            # Проверяем что это нужный label
-                            if "Интернет" in label_text and "Низкая скорость" in label_text and "3G/4G" in label_text:
+
+                            # Проверяем что это нужный label (более гибкая проверка)
+                            if ("Интернет" in label_text or "Интернет" in label.get_attribute("innerHTML", "")) and \
+                               ("Низкая скорость" in label_text or "Низкая скорость" in label.get_attribute("innerHTML", "")) and \
+                               ("3G/4G" in label_text or "3G/4G" in label.get_attribute("innerHTML", "")):
                                 self.logger.info(f"🎯 Найден правильный label в iframe {i+1}!")
                                 return label
                             else:
                                 self.logger.info(f"⚠️ Label в iframe {i+1} не подходит: '{label_text}'")
+                                # Дополнительная диагностика
+                                try:
+                                    inner_html = label.get_attribute("innerHTML", "")
+                                    self.logger.info(f"🔍 innerHTML: '{inner_html}'")
+                                except:
+                                    pass
                     except:
                         # Label не найден в этом iframe
                         pass
-                    
+
                     # Возвращаемся в основной документ для следующего iframe
                     self.driver.switch_to.default_content()
-                    
+
                 except Exception as e:
                     self.logger.warning(f"⚠️ Ошибка при проверке iframe {i+1}: {e}")
                     # Возвращаемся в основной документ
@@ -495,10 +502,10 @@ class FormFiller:
                     except:
                         pass
                     continue
-            
+
             self.logger.warning("⚠️ Label не найден ни в одном iframe")
             return None
-            
+
         except Exception as e:
             self.logger.error(f"❌ Ошибка при поиске во всех iframe'ах: {e}")
             # Возвращаемся в основной документ
