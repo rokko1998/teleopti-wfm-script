@@ -255,7 +255,7 @@ class FormFiller:
                         normalize-space(text()) = 'Интернет&nbsp;&gt;&gt;&nbsp;Низкая&nbsp;скорость&nbsp;в&nbsp;3G/4G' or
                         normalize-space(.) = 'Интернет&nbsp;&gt;&gt;&nbsp;Низкая&nbsp;скорость&nbsp;в&nbsp;3G/4G'
                     ]"""
-                    
+
                     # Ищем через iframe_handler, а не через driver напрямую
                     label = self.iframe_handler.find_element_in_iframe(("xpath", label_xpath))
                     if not label:

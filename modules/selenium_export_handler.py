@@ -193,6 +193,16 @@ class SeleniumExportHandler:
                 time.sleep(0.3)
 
             self.logger.error(f"❌ Файл не появился за {timeout} секунд")
+
+            # Дополнительная диагностика - показываем что есть в папке
+            try:
+                all_files = list(download_dir.glob("*"))
+                recent_files = [f for f in all_files if f.is_file() and (time.time() - f.stat().st_mtime) < 300]  # Файлы за последние 5 минут
+                if recent_files:
+                    self.logger.info(f"📋 Недавние файлы в папке: {[f.name for f in recent_files[:5]]}")
+            except:
+                pass
+
             return None
 
         except Exception as e:
@@ -266,6 +276,13 @@ class SeleniumExportHandler:
 
             # 6) если файла нет — просто возвращаем None, не засоряем логи
             self.logger.warning("⚠️ Файл не появился в срок")
+
+            # Пробуем еще раз с увеличенным timeout (180с)
+            self.logger.info("🔄 Пробуем еще раз с увеличенным timeout (180с)...")
+            result = self.wait_for_download(download_dir, timeout=180)
+            if result:
+                return result
+
             return None
 
         except Exception as e:
@@ -369,14 +386,14 @@ class SeleniumExportHandler:
         """Ждать загрузки отчета по появлению элементов на странице"""
         try:
             self.logger.info("🔍 Ждем загрузки отчета по элементам страницы...")
-            
+
             start_time = time.time()
-            
+
             while time.time() - start_time < timeout:
                 try:
                     # Ищем признаки загруженного отчета
                     indicators = []
-                    
+
                     # 1. Проверяем наличие кнопки экспорта
                     try:
                         export_button = self.driver.find_element("xpath", "//a[contains(@onclick, 'exportReport') or contains(@onclick, 'EXCEL')]")
@@ -384,7 +401,7 @@ class SeleniumExportHandler:
                             indicators.append("✅ Кнопка экспорта найдена")
                     except:
                         pass
-                    
+
                     # 2. Проверяем наличие данных в отчете (таблицы, строки)
                     try:
                         data_rows = self.driver.find_elements("xpath", "//table//tr[position()>1]")  # Строки с данными
@@ -392,7 +409,7 @@ class SeleniumExportHandler:
                             indicators.append(f"✅ Данные в отчете: {len(data_rows)} строк")
                     except:
                         pass
-                    
+
                     # 3. Проверяем отсутствие индикатора загрузки
                     try:
                         loading_indicator = self.driver.find_element("xpath", "//*[contains(text(), 'Loading') or contains(text(), 'Загрузка') or contains(@class, 'loading')]")
@@ -402,7 +419,7 @@ class SeleniumExportHandler:
                             continue
                     except:
                         pass
-                    
+
                     # 4. Проверяем готовность страницы
                     ready_state = self.driver.execute_script("return document.readyState")
                     if ready_state == "complete":
@@ -411,23 +428,23 @@ class SeleniumExportHandler:
                         indicators.append(f"⏳ Состояние страницы: {ready_state}")
                         time.sleep(1)
                         continue
-                    
+
                     # Если нашли все признаки загрузки
                     if len(indicators) >= 2:  # Минимум 2 признака
                         self.logger.info("✅ Отчет загружен по элементам:")
                         for indicator in indicators:
                             self.logger.info(f"   {indicator}")
                         return True
-                    
+
                     time.sleep(1)
-                    
+
                 except Exception as e:
                     self.logger.warning(f"⚠️ Ошибка при проверке элементов: {e}")
                     time.sleep(1)
-            
+
             self.logger.warning(f"⚠️ Timeout ожидания загрузки отчета ({timeout}с)")
             return False
-            
+
         except Exception as e:
             self.logger.error(f"❌ Ошибка при ожидании загрузки отчета: {e}")
             return False
