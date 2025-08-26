@@ -1,0 +1,111 @@
+let
+    //------------------------------------------------------------------
+    //-- 1. Путь к файлу из таблицы "Источники" ------------------------
+    //------------------------------------------------------------------
+    ПутьКФайлу =
+        Excel.CurrentWorkbook(){[Name = "Источники"]}[Content]{1}[#"Путь к источнику"],
+
+    //------------------------------------------------------------------
+    //-- 2. Читаем лист ------------------------------------------------
+    //------------------------------------------------------------------
+    Источник            = Excel.Workbook(File.Contents(ПутьКФайлу), null, true),
+    #"Массовые проблемы" = Источник{[Item = "Массовые проблемы", Kind = "Sheet"]}[Data],
+
+    //------------------------------------------------------------------
+    //-- 3. Первая строка → текст  ►  PromoteHeaders -------------------
+    //------------------------------------------------------------------
+    #"Первая строка как текст" =
+        Table.TransformColumnTypes(
+            #"Массовые проблемы",
+            List.Transform(Table.ColumnNames(#"Массовые проблемы"), each {_, type text})
+        ),
+    #"Повышенные заголовки" = Table.PromoteHeaders(#"Первая строка как текст"),
+
+    //------------------------------------------------------------------
+    //-- 4. Типы данных ------------------------------------------------
+    //------------------------------------------------------------------
+    #"Измененный тип" = Table.TransformColumnTypes(
+        #"Повышенные заголовки",
+        {
+            {"Номер", Int64.Type},              {"Комментарий", type text},
+            {"Заметки", Int64.Type},            {"Заметки сегодня", Int64.Type},
+            {"Статус", type text},              {"Название", type text},
+            {"Регион", type text},              {"Города", type text},
+            {"Краткое описание", type text},    {"Причина заметки", type text},
+            {"Категория обращения", type text}, {"Открыта", type date},
+            {"Начало", type date},              {"Окончание", type any},
+            {"Что происходит", type text},      {"Как узнали о проблеме", type text},
+            {"Причина", type text},             {"Объект", type text},
+            {"Номер TT", type text},            {"Тип проблемы", type text},
+            {"Автор", type text},               {"Критичная", type logical}
+        }
+    ),
+    #"Строки с примененным фильтром" = Table.SelectRows(#"Измененный тип", each ([Причина] = "Блокировка по запросу регулятора")),
+
+    #"Выбраны колонки" =
+        Table.SelectColumns(#"Строки с примененным фильтром",
+            {"Номер", "Название", "Заметки", "Регион", "Города", "Статус", "Причина"}
+        ),
+
+    //------------------------------------------------------------------
+    //-- 6. Функция CleanTitle  ----------------------------------------
+    //------------------------------------------------------------------
+    CleanTitle = (txt as nullable any) as nullable text =>
+        let
+            s  = if txt = null then null else Text.From(txt),
+            t0 = if s   = null then null else Text.Trim(s),
+
+            dq = Character.FromNumber(34),
+
+            t1 =
+                if    t0 = null then null
+                else if Text.StartsWith(t0, dq)
+                     then Text.Trim(Text.AfterDelimiter(t0, dq, 1))
+                else if Text.StartsWith(t0, "«")
+                     then Text.Trim(Text.AfterDelimiter(t0, "»"))
+                else t0,
+
+            t2 =
+                if    t1 = null then null
+                else if Text.Contains(t1, "(Смотри")
+                     then Text.Trim(Text.BeforeDelimiter(t1, "(Смотри"))
+                else t1
+        in
+            t2,
+
+    #"Очистка Названия" =
+        Table.TransformColumns(#"Выбраны колонки",
+            {"Название", each CleanTitle(_), type text}
+        ),
+
+    //------------------------------------------------------------------
+    //-- 7. Функция CleanRegion  ---------------------------------------
+    //------------------------------------------------------------------
+    CleanRegion = (txt as nullable any) as nullable text =>
+        let
+            s        = if txt = null then null else Text.From(txt),
+            parts    = if s   = null then {} else
+                           List.Transform(Text.Split(s, ","), each Text.Trim(_)),
+
+            suffixes = {" CDMA", " NEW", " MVNO TTK", " MVNO", " LTE450", "MVNO Тест "},
+
+            strip    = (p as text) =>
+                Text.Trim(
+                    List.Accumulate(suffixes, p,
+                        (state, suf) => Text.Replace(state, suf, "")
+                    )
+                ),
+
+            cleaned  = List.Transform(parts, strip),
+            nonEmpty = List.Select(cleaned, each _ <> ""),
+
+            result   = if List.Count(nonEmpty) = 0 then null else nonEmpty{0}
+        in
+            result,
+
+    #"Очистка Региона" =
+        Table.TransformColumns(#"Очистка Названия",
+            {"Регион", each CleanRegion(_), type text}
+        )
+in
+    #"Очистка Региона"
