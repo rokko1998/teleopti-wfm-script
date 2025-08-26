@@ -5,6 +5,7 @@
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import JavascriptException, WebDriverException
 import logging
 import time
 
@@ -198,49 +199,53 @@ class ExcelExporter:
             return False
 
     def export_to_excel(self, wait_time=120):
-        """Экспортировать отчет в Excel"""
+        """Экспортировать отчет в Excel (улучшенная версия)"""
         try:
             self.logger.info("📤 Начинаем экспорт отчета в Excel...")
 
-            # Ждем готовности отчета (кнопка экспорта уже найдена)
+            # Ждем готовности отчета
             if not self.wait_for_report_ready(timeout=wait_time):
                 return False
 
-            # Ищем кнопку экспорта (которая уже была найдена в wait_for_report_ready)
-            export_selectors = [
-                "a[onclick*='exportReport']",
-                "a[onclick*='EXCELOPENXML']",
-                "a[title*='Экспорт']",
-                "a[title*='Export']",
-                "a[alt*='Excel']",
-                "a[class*='ActiveLink']",
-                "div[id*='Export'] a",
-                "div[class*='ToolbarExport'] a"
-            ]
+            # 1. Сначала показываем диагностику элементов экспорта
+            self.logger.info("🔍 Анализируем доступные элементы экспорта...")
+            export_elements = self.find_export_elements_via_js()
 
-            export_button = None
-            for selector in export_selectors:
-                try:
-                    export_button = self.driver.find_element(By.CSS_SELECTOR, selector)
-                    if export_button.is_displayed() and export_button.is_enabled():
-                        break
-                except:
-                    continue
+            # 2. Пробуем прямой клик через JavaScript (как в вашем тесте)
+            self.logger.info("🚀 Пробуем прямой экспорт через JavaScript...")
+            if self.click_excel_export_via_js():
+                self.logger.info("✅ Экспорт в Excel запущен через JavaScript")
+                return True
 
+            # 3. Если JavaScript не сработал, используем стандартный подход
+            self.logger.info("🔄 Используем стандартный подход через Selenium...")
+
+            # Ищем кнопку экспорта через обновленный метод
+            export_button = self.find_export_button_by_text()
             if not export_button:
-                self.logger.error("❌ Кнопка экспорта не найдена")
+                self.logger.error("❌ Кнопка экспорта не найдена всеми методами")
                 return False
 
             # Кликаем по кнопке экспорта
-            self.logger.info("💾 Нажимаем кнопку экспорта...")
-            export_button.click()
+            self.logger.info("💾 Нажимаем кнопку экспорта через Selenium...")
+            try:
+                export_button.click()
+            except Exception as click_error:
+                self.logger.warning(f"⚠️ Обычный клик не сработал: {click_error}")
+                # Пробуем JavaScript клик
+                try:
+                    self.driver.execute_script("arguments[0].click();", export_button)
+                    self.logger.info("✅ Клик выполнен через JavaScript")
+                except Exception as js_click_error:
+                    self.logger.error(f"❌ JavaScript клик тоже не сработал: {js_click_error}")
+                    return False
 
-            # Ждем появления выпадающего меню
+            # Ждем появления выпадающего меню (если нужно)
             time.sleep(2)
 
-            # Выбираем формат Excel
+            # Проверяем, нужно ли выбирать формат Excel из меню
             if not self.select_excel_format():
-                return False
+                self.logger.warning("⚠️ Не удалось выбрать формат Excel из меню, возможно экспорт уже запущен")
 
             self.logger.info("✅ Экспорт в Excel завершен успешно")
             return True
@@ -249,9 +254,194 @@ class ExcelExporter:
             self.logger.error(f"❌ Ошибка при экспорте в Excel: {e}")
             return False
 
-    def find_export_button_by_text(self):
-        """Найти кнопку экспорта по тексту содержимого (более надежный способ)"""
+    def find_excel_export_via_js(self):
+        """Найти Excel кнопку через JavaScript (как в тестовом скрипте)"""
         try:
+            self.logger.info("🔍 Ищем Excel кнопку через JavaScript...")
+
+            # JavaScript код для поиска Excel кнопки (основан на вашем тесте)
+            js_code = """
+            // 1. Находим Excel кнопку
+            const excelLink = document.querySelector('a.ActiveLink[text="Excel"]') ||
+                              Array.from(document.querySelectorAll('a.ActiveLink')).find(el => el.textContent.includes('Excel'));
+
+            if (excelLink) {
+                return {
+                    found: true,
+                    element: excelLink,
+                    text: excelLink.textContent,
+                    className: excelLink.className,
+                    onclick: excelLink.onclick ? excelLink.onclick.toString() : null,
+                    isVisible: excelLink.offsetParent !== null &&
+                              excelLink.style.display !== 'none' &&
+                              excelLink.style.visibility !== 'hidden'
+                };
+            }
+
+            // 2. Альтернативный поиск по exportReport функциям
+            const exportElements = Array.from(document.querySelectorAll('*')).filter(el => {
+                const onclick = el.onclick ? el.onclick.toString() : '';
+                return onclick.includes('exportReport') && onclick.includes('EXCELOPENXML');
+            });
+
+            if (exportElements.length > 0) {
+                const excelElement = exportElements.find(el =>
+                    el.textContent.includes('Excel') || el.textContent.includes('excel')
+                );
+
+                if (excelElement) {
+                    return {
+                        found: true,
+                        element: excelElement,
+                        text: excelElement.textContent,
+                        className: excelElement.className,
+                        onclick: excelElement.onclick.toString(),
+                        isVisible: excelElement.offsetParent !== null
+                    };
+                }
+            }
+
+            return { found: false };
+            """
+
+            # Выполняем JavaScript
+            result = self.driver.execute_script(js_code)
+
+            if result and result.get('found'):
+                self.logger.info(f"✅ Excel кнопка найдена через JS: {result.get('text', 'Неизвестно')}")
+                self.logger.info(f"📊 Видимость: {result.get('isVisible', False)}")
+                self.logger.info(f"📋 OnClick: {result.get('onclick', 'Нет')}")
+
+                # Возвращаем WebElement (JavaScript вернул ссылку на элемент)
+                return result.get('element')
+            else:
+                self.logger.warning("⚠️ Excel кнопка не найдена через JavaScript")
+                return None
+
+        except JavascriptException as e:
+            self.logger.error(f"❌ Ошибка выполнения JavaScript: {e}")
+            return None
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при поиске через JavaScript: {e}")
+            return None
+
+    def find_export_elements_via_js(self):
+        """Найти все элементы с exportReport через JavaScript"""
+        try:
+            self.logger.info("🔍 Ищем все элементы с exportReport...")
+
+            js_code = """
+            const exportElements = Array.from(document.querySelectorAll('*')).filter(el => {
+                const onclick = el.onclick ? el.onclick.toString() : '';
+                return onclick.includes('exportReport');
+            });
+
+            return exportElements.map((el, i) => ({
+                index: i + 1,
+                tag: el.tagName,
+                text: el.textContent.trim(),
+                onclick: el.onclick ? el.onclick.toString() : null,
+                className: el.className,
+                id: el.id
+            }));
+            """
+
+            elements = self.driver.execute_script(js_code)
+
+            if elements:
+                self.logger.info(f"📋 Найдено {len(elements)} элементов с exportReport:")
+                for element in elements:
+                    self.logger.info(f"  • {element['index']}: {element['tag']} - '{element['text'][:50]}{'...' if len(element['text']) > 50 else ''}'")
+
+            return elements
+
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при поиске элементов через JavaScript: {e}")
+            return []
+
+    def click_excel_export_via_js(self):
+        """Нажать на Excel экспорт через JavaScript"""
+        try:
+            self.logger.info("🖱️ Пытаемся нажать Excel экспорт через JavaScript...")
+
+            js_code = """
+            // 1. Находим Excel кнопку
+            const excelLink = document.querySelector('a.ActiveLink[text="Excel"]') ||
+                              Array.from(document.querySelectorAll('a.ActiveLink')).find(el => el.textContent.includes('Excel'));
+
+            if (excelLink) {
+                try {
+                    excelLink.click();
+                    return { success: true, method: 'ActiveLink', text: excelLink.textContent };
+                } catch (e) {
+                    return { success: false, error: e.message, method: 'ActiveLink' };
+                }
+            }
+
+            // 2. Альтернативный способ - поиск по exportReport
+            const exportElements = Array.from(document.querySelectorAll('*')).filter(el => {
+                const onclick = el.onclick ? el.onclick.toString() : '';
+                return onclick.includes('exportReport') && onclick.includes('EXCELOPENXML');
+            });
+
+            if (exportElements.length > 0) {
+                const excelElement = exportElements.find(el =>
+                    el.textContent.includes('Excel') || el.textContent.includes('excel')
+                );
+
+                if (excelElement) {
+                    try {
+                        excelElement.click();
+                        return { success: true, method: 'exportReport', text: excelElement.textContent };
+                    } catch (e) {
+                        return { success: false, error: e.message, method: 'exportReport' };
+                    }
+                }
+            }
+
+            // 3. Прямой вызов exportReport, если есть доступ к ReportViewerControl
+            try {
+                if (typeof $find !== 'undefined') {
+                    const control = $find('ReportViewerControl');
+                    if (control && control.exportReport) {
+                        control.exportReport('EXCELOPENXML');
+                        return { success: true, method: 'direct_call' };
+                    }
+                }
+            } catch (e) {
+                // Игнорируем ошибку, пробуем другие способы
+            }
+
+            return { success: false, error: 'Excel кнопка не найдена' };
+            """
+
+            result = self.driver.execute_script(js_code)
+
+            if result and result.get('success'):
+                method = result.get('method', 'unknown')
+                text = result.get('text', '')
+                self.logger.info(f"✅ Excel экспорт запущен через {method}: '{text}'")
+                return True
+            else:
+                error = result.get('error', 'Неизвестная ошибка') if result else 'Нет результата'
+                self.logger.error(f"❌ Не удалось запустить Excel экспорт: {error}")
+                return False
+
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при клике через JavaScript: {e}")
+            return False
+
+    def find_export_button_by_text(self):
+        """Найти кнопку экспорта по тексту содержимого (обновленная версия)"""
+        try:
+            # Сначала пробуем через JavaScript (более надежно)
+            js_element = self.find_excel_export_via_js()
+            if js_element:
+                return js_element
+
+            # Если JavaScript не сработал, используем старый метод
+            self.logger.info("🔍 Используем стандартный поиск...")
+
             # Ищем все ссылки на странице
             all_links = self.driver.find_elements(By.TAG_NAME, "a")
 
@@ -265,20 +455,15 @@ class ExcelExporter:
 
                     # Ищем признаки кнопки экспорта
                     if any(keyword in link_text for keyword in ['excel', 'экспорт', 'export']):
-                        if link.is_displayed() and link.is_enabled():
+                        # УБИРАЕМ проверку is_displayed() - элемент может быть скрыт, но кликабелен
+                        if link.is_enabled():
                             self.logger.info(f"✅ Кнопка экспорта найдена по тексту: '{link_text}'")
                             return link
 
-                    # Проверяем title и alt
-                    if any(keyword in link_title.lower() for keyword in ['excel', 'экспорт', 'export']):
-                        if link.is_displayed() and link.is_enabled():
-                            self.logger.info(f"✅ Кнопка экспорта найдена по title: '{link_title}'")
-                            return link
-
-                    # Проверяем onclick
-                    if 'exportReport' in link_onclick or 'EXCELOPENXML' in link_onclick:
-                        if link.is_displayed() and link.is_enabled():
-                            self.logger.info(f"✅ Кнопка экспорта найдена по onclick: '{link_onclick}'")
+                    # Проверяем onclick на наличие exportReport
+                    if 'exportReport' in link_onclick and 'EXCELOPENXML' in link_onclick:
+                        if link.is_enabled():
+                            self.logger.info(f"✅ Кнопка экспорта найдена по onclick: '{link_onclick[:100]}...'")
                             return link
 
                 except:
@@ -288,4 +473,90 @@ class ExcelExporter:
 
         except Exception as e:
             self.logger.error(f"❌ Ошибка при поиске кнопки экспорта по тексту: {e}")
+            return None
+
+    def run_excel_export_test(self):
+        """Запустить полный тест экспорта Excel (как ваш JavaScript тест)"""
+        try:
+            self.logger.info("=== 🧪 ТЕСТИРОВАНИЕ EXCEL ЭКСПОРТА ===")
+
+            # Выполняем тот же JavaScript код, что и в вашем тесте
+            js_test_code = """
+            console.log('=== ТЕСТИРОВАНИЕ EXCEL ЭКСПОРТА ===');
+
+            // 1. Находим Excel кнопку
+            const excelLink = document.querySelector('a.ActiveLink[text="Excel"]') ||
+                              Array.from(document.querySelectorAll('a.ActiveLink')).find(el => el.textContent.includes('Excel'));
+
+            const result = {
+                excelLinkFound: !!excelLink,
+                excelLinkInfo: null,
+                parentDropdown: null,
+                isVisible: false,
+                clickResult: null,
+                exportElements: []
+            };
+
+            if (excelLink) {
+                result.excelLinkInfo = {
+                    text: excelLink.textContent,
+                    className: excelLink.className,
+                    onclick: excelLink.onclick ? excelLink.onclick.toString() : null,
+                    style: excelLink.style.cssText
+                };
+
+                // Проверяем родительский dropdown
+                result.parentDropdown = excelLink.closest('[class*="Menu"], [class*="dropdown"], [class*="MenuBar"]');
+
+                // Проверяем видимость
+                result.isVisible = excelLink.offsetParent !== null &&
+                                 excelLink.style.display !== 'none' &&
+                                 excelLink.style.visibility !== 'hidden';
+            }
+
+            // Ищем все элементы с exportReport
+            const exportElements = Array.from(document.querySelectorAll('*')).filter(el => {
+                const onclick = el.onclick ? el.onclick.toString() : '';
+                return onclick.includes('exportReport');
+            });
+
+            result.exportElements = exportElements.map((el, i) => ({
+                index: i + 1,
+                tag: el.tagName,
+                text: el.textContent.trim(),
+                onclick: el.onclick.toString()
+            }));
+
+            return result;
+            """
+
+            test_result = self.driver.execute_script(js_test_code)
+
+            # Выводим результаты теста
+            if test_result:
+                self.logger.info(f"📊 Excel ссылка найдена: {test_result.get('excelLinkFound', False)}")
+
+                if test_result.get('excelLinkInfo'):
+                    info = test_result['excelLinkInfo']
+                    self.logger.info(f"📋 Excel ссылка:")
+                    self.logger.info(f"   • Текст: {info.get('text', 'Нет')}")
+                    self.logger.info(f"   • Класс: {info.get('className', 'Нет')}")
+                    self.logger.info(f"   • OnClick: {info.get('onclick', 'Нет')[:100] if info.get('onclick') else 'Нет'}...")
+
+                self.logger.info(f"👁️ Excel кнопка видима: {test_result.get('isVisible', False)}")
+
+                export_elements = test_result.get('exportElements', [])
+                self.logger.info(f"📋 Элементы с exportReport: {len(export_elements)}")
+
+                for element in export_elements[:5]:  # Показываем первые 5
+                    text_preview = element['text'][:50] + '...' if len(element['text']) > 50 else element['text']
+                    self.logger.info(f"   • {element['index']}: {element['tag']} - '{text_preview}'")
+
+                if len(export_elements) > 5:
+                    self.logger.info(f"   ... и еще {len(export_elements) - 5} элементов")
+
+            return test_result
+
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при выполнении теста: {e}")
             return None
