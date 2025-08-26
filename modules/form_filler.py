@@ -276,11 +276,26 @@ class FormFiller:
                         self.logger.info("✅ Модальное окно ожидания не найдено")
                         break
 
-                # Дополнительная задержка для стабилизации
+                                # Дополнительная задержка для стабилизации
                 time.sleep(2)
                 self.logger.info("✅ Готовы к выбору чекбокса")
 
-                                # 3. Теперь выбираем нужный чекбокс (пробуем label, затем fallback)
+                # 3. СКРОЛЛИМ dropdown для поиска нужного label (он может быть ниже)
+                self.logger.info("📜 Скроллим dropdown для поиска нужного label...")
+                try:
+                    # Ищем контейнер с чекбоксами (обычно div с классом dropdown или подобным)
+                    dropdown_container = self.iframe_handler.find_element_in_iframe(("xpath", "//div[contains(@class, 'dropdown') or contains(@class, 'drop') or contains(@id, 'DropDown')]"))
+                    if dropdown_container:
+                        # Скроллим вниз для поиска нужного элемента
+                        self.driver.execute_script("arguments[0].scrollTop = arguments[0].scrollHeight;", dropdown_container)
+                        self.logger.info("✅ Dropdown прокручен вниз")
+                        time.sleep(1)  # Ждем завершения скролла
+                    else:
+                        self.logger.info("⚠️ Контейнер dropdown не найден, продолжаем без скролла")
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Не удалось прокрутить dropdown: {e}")
+
+                # 4. Теперь выбираем нужный чекбокс (пробуем label, затем fallback)
                 self.logger.info("🔍 Ищем чекбокс 'Низкая скорость в 3G/4G'...")
 
                 # Пробуем найти по label тексту (тихо, без ошибок в логах)
@@ -309,23 +324,63 @@ class FormFiller:
                             raise Exception("Label не найден в текущем iframe")
                     except Exception as e:
                         self.logger.warning(f"⚠️ Label не найден в текущем iframe: {e}")
+
+                                            # Fallback: ищем по более простому XPath в том же блоке
+                    self.logger.info("🔄 Fallback: ищем по простому XPath в том же блоке...")
+                    try:
+                        fallback_xpath = """//label[
+                            contains(., 'Интернет') and
+                            contains(., 'Низкая скорость') and
+                            contains(., '3G/4G')
+                        ]"""
+                        label = self.iframe_handler.find_element_in_iframe(("xpath", fallback_xpath))
+                        if label:
+                            self.logger.info("✅ Label найден по fallback XPath")
+                        else:
+                            raise Exception("Label не найден даже по fallback XPath")
+                    except Exception as fallback_e:
+                        self.logger.warning(f"⚠️ Fallback XPath не сработал: {fallback_e}")
                         
-                        # Fallback: ищем по более простому XPath в том же блоке
-                        self.logger.info("🔄 Fallback: ищем по простому XPath в том же блоке...")
+                        # Последняя попытка: пошаговый скролл и поиск
+                        self.logger.info("🔄 Последняя попытка: пошаговый скролл и поиск...")
                         try:
-                            fallback_xpath = """//label[
-                                contains(., 'Интернет') and 
-                                contains(., 'Низкая скорость') and 
-                                contains(., '3G/4G')
-                            ]"""
-                            label = self.iframe_handler.find_element_in_iframe(("xpath", fallback_xpath))
-                            if label:
-                                self.logger.info("✅ Label найден по fallback XPath")
+                            # Ищем контейнер dropdown
+                            dropdown_container = self.iframe_handler.find_element_in_iframe(("xpath", "//div[contains(@class, 'dropdown') or contains(@class, 'drop') or contains(@id, 'DropDown')]"))
+                            if dropdown_container:
+                                # Пошаговый скролл для поиска
+                                scroll_height = self.driver.execute_script("return arguments[0].scrollHeight;", dropdown_container)
+                                client_height = self.driver.execute_script("return arguments[0].clientHeight;", dropdown_container)
+                                
+                                if scroll_height > client_height:  # Есть что скроллить
+                                    self.logger.info(f"📜 Выполняем пошаговый скролл (высота: {scroll_height}, видимая: {client_height})...")
+                                    
+                                    # Скроллим по частям
+                                    for step in range(0, scroll_height, client_height // 2):
+                                        self.driver.execute_script(f"arguments[0].scrollTop = {step};", dropdown_container)
+                                        time.sleep(0.5)  # Ждем загрузки
+                                        
+                                        # Пробуем найти label на текущей позиции
+                                        try:
+                                            label = self.iframe_handler.find_element_in_iframe(("xpath", fallback_xpath))
+                                            if label and label.is_displayed():
+                                                self.logger.info(f"✅ Label найден при скролле на позиции {step}")
+                                                break
+                                        except:
+                                            continue
+                                    
+                                    # Если не нашли, возвращаемся в начало
+                                    self.driver.execute_script("arguments[0].scrollTop = 0;", dropdown_container)
+                                else:
+                                    self.logger.info("📜 Скролл не нужен - все элементы видны")
                             else:
-                                raise Exception("Label не найден даже по fallback XPath")
-                        except Exception as fallback_e:
-                            self.logger.error(f"❌ Label не найден ни одним способом: {fallback_e}")
-                            raise fallback_e
+                                self.logger.warning("⚠️ Контейнер dropdown не найден для пошагового скролла")
+                        except Exception as scroll_e:
+                            self.logger.warning(f"⚠️ Пошаговый скролл не удался: {scroll_e}")
+                        
+                        # Если все попытки не удались
+                        if not label:
+                            self.logger.error("❌ Label не найден ни одним способом")
+                            raise Exception("Label не найден даже после пошагового скролла")
 
                     # Дополнительная проверка - убеждаемся что это именно нужный label
                     label_text = label.text.strip()
