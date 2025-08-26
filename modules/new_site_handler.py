@@ -13,12 +13,13 @@ from .form_elements import FormElements
 from .iframe_handler import IframeHandler
 from .form_filler import FormFiller
 from .excel_exporter import ExcelExporter
+from .selenium_export_handler import SeleniumExportHandler
 
 
 class NewSiteHandler:
     """Основной класс для работы с новым сайтом отчетов"""
 
-    def __init__(self, driver, logger):
+    def __init__(self, driver, logger, download_dir=None):
         self.driver = driver
         self.logger = logger
 
@@ -27,6 +28,9 @@ class NewSiteHandler:
         self.iframe_handler = IframeHandler(driver, logger)
         self.form_filler = FormFiller(driver, logger, self.iframe_handler, self.form_elements)
         self.excel_exporter = ExcelExporter(driver, logger)
+
+                # Новый модуль для "боевого" сценария экспорта
+        self.selenium_exporter = SeleniumExportHandler(driver, logger, download_dir)
 
     def process_report(self, wait_time=60):
         """Основной метод для обработки отчета"""
@@ -62,10 +66,15 @@ class NewSiteHandler:
                 self.logger.error("❌ Не удалось отправить отчет")
                 return False
 
-            # 6. Экспортируем в Excel
-            if not self.excel_exporter.export_to_excel(wait_time=wait_time):
-                self.logger.error("❌ Не удалось экспортировать в Excel")
-                return False
+            # 6. Экспортируем в Excel (пробуем "боевой" сценарий, затем fallback)
+            self.logger.info("📤 Пробуем экспорт через 'боевой' сценарий...")
+            if self.export_excel_by_click(wait_time=wait_time):
+                self.logger.info("✅ Экспорт через 'боевой' сценарий успешен")
+            else:
+                self.logger.warning("⚠️ 'Боевой' сценарий не сработал, пробуем fallback...")
+                if not self.excel_exporter.export_to_excel(wait_time=wait_time):
+                    self.logger.error("❌ Не удалось экспортировать в Excel ни одним способом")
+                    return False
 
             self.logger.info("🎉 Обработка отчета завершена успешно!")
             return True
@@ -88,3 +97,39 @@ class NewSiteHandler:
         """Экспортировать в Excel (устаревший метод, оставлен для совместимости)"""
         self.logger.warning("⚠️ Метод export_to_excel устарел, используйте process_report")
         return self.process_report(wait_time)
+
+    def export_excel_by_click(self, report_url: str = None, wait_time=120):
+        """Экспорт Excel через "боевой" сценарий - клики по меню"""
+        try:
+            self.logger.info("🚀 Запускаем 'боевой' сценарий экспорта Excel...")
+
+            # Если URL не передан, используем текущий
+            if not report_url:
+                report_url = self.driver.current_url
+                self.logger.info(f"📄 Используем текущий URL: {report_url}")
+
+            # Запускаем экспорт через клики
+            result = self.selenium_exporter.export_excel_by_click(
+                report_url=report_url,
+                download_dir=self.selenium_exporter.download_dir,
+                overall_timeout=wait_time
+            )
+
+            if result:
+                self.logger.info(f"🎉 Экспорт Excel завершен успешно: {result}")
+                return True
+            else:
+                self.logger.error("❌ Экспорт Excel не удался")
+                return False
+
+        except Exception as e:
+            self.logger.error(f"❌ Критическая ошибка при экспорте Excel: {e}")
+            return False
+
+    def get_download_directory(self):
+        """Получить текущую директорию загрузок"""
+        return self.selenium_exporter.download_dir
+
+    def set_download_directory(self, new_dir):
+        """Изменить директорию загрузок"""
+        return self.selenium_exporter.set_download_directory(new_dir)
