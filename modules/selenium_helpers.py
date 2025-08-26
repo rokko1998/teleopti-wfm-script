@@ -150,6 +150,47 @@ def get_driver(headless: bool = True) -> webdriver.Chrome:
         # Убираем индикатор автоматизации
         driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
+        # АГРЕССИВНО отключаем Google логи и другие шумные сообщения
+        logger.info("🔇 Отключаем Google логи и шумные сообщения...")
+        try:
+            driver.execute_script("""
+                (function () {
+                    const originalLog = console.log;
+                    const originalWarn = console.warn;
+                    const originalError = console.error;
+
+                    const isNoisy = (msg) =>
+                        msg.includes('google_apis') ||
+                        msg.includes('voice_transcription') ||
+                        msg.includes('AiaRequest') ||
+                        msg.includes('Registration response error') ||
+                        msg.includes('DEPRECATED_ENDPOINT') ||
+                        msg.includes('cert_issuer_source_aia') ||
+                        msg.includes('OnFetchCompleted got error') ||
+                        msg.includes('WARNING: All log messages') ||
+                        msg.includes('net\\cert') ||
+                        msg.includes('gcm\\engine');
+
+                    console.log = function (...args) {
+                        const message = args.join(' ');
+                        if (!isNoisy(message)) originalLog.apply(console, args);
+                    };
+
+                    console.warn = function (...args) {
+                        const message = args.join(' ');
+                        if (!isNoisy(message)) originalWarn.apply(console, args);
+                    };
+
+                    console.error = function (...args) {
+                        const message = args.join(' ');
+                        if (!isNoisy(message)) originalError.apply(console, args);
+                    };
+                })();
+            """)
+            logger.info("✅ Google логи отключены")
+        except Exception as e:
+            logger.warning(f"⚠️ Не удалось отключить Google логи: {e}")
+
         # КРИТИЧЕСКИ ВАЖНО: Настройка поведения скачивания через CDP (предложено пользователем)
         logger.info("🔧 Настраиваем скачивание через Chrome DevTools Protocol...")
         try:

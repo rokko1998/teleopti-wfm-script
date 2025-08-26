@@ -236,7 +236,12 @@ class SeleniumExportHandler:
             if not self.switch_to_frame_with_reportviewer(timeout=30):
                 raise RuntimeError("ReportViewer frame not found")
 
-            # 2) почистить старые хвосты
+            # 2) Ждем загрузки отчета по XHR (критически важно!)
+            self.logger.info("⏳ Ждем полной загрузки отчета по XHR...")
+            if not self.wait_for_report_loaded_xhr(timeout=60):
+                self.logger.warning("⚠️ Не удалось дождаться загрузки отчета по XHR, продолжаем...")
+
+            # 3) почистить старые хвосты
             self.logger.info("🧹 Очищаем старые файлы загрузок...")
             for p in download_dir.glob("*"):
                 if p.suffix.lower() in {".xlsx", ".crdownload"}:
@@ -246,20 +251,20 @@ class SeleniumExportHandler:
                     except Exception as e:
                         self.logger.warning(f"⚠️ Не удалось удалить {p.name}: {e}")
 
-            # 3) открыть меню и кликнуть Excel
+            # 4) открыть меню и кликнуть Excel
             self.logger.info("🖱️ Открываем меню Export и кликаем Excel...")
             ok = self.open_menu_and_click_excel(self.driver)
             if not ok:
                 raise RuntimeError("Failed to click Excel menu item")
 
-            # 4) дождаться файла
+            # 5) дождаться файла
             self.logger.info("⏳ Ждем появления файла Excel...")
             target = self.wait_for_download(download_dir, r".*\.xlsx$", timeout=overall_timeout)
             if target:
                 self.logger.info(f"🎉 Экспорт завершен успешно: {target}")
                 return target
 
-            # 5) если файла нет — проверим, ушёл ли запрос экспорта
+            # 6) если файла нет — проверим, ушёл ли запрос экспорта
             self.logger.warning("⚠️ Файл не появился, проверяем performance логи...")
             url = self.find_export_url_in_perf_logs(self.driver, timeout=10)
             if url:
@@ -296,4 +301,62 @@ class SeleniumExportHandler:
             return True
         except Exception as e:
             self.logger.error(f"❌ Ошибка при изменении директории загрузок: {e}")
+            return False
+
+    def wait_for_report_loaded_xhr(self, timeout=60):
+        """Ждать загрузки отчета по завершению XHR запросов"""
+        try:
+            self.logger.info("🔍 Ждем завершения XHR запросов для загрузки отчета...")
+
+            start_time = time.time()
+            last_activity_time = start_time
+
+            while time.time() - start_time < timeout:
+                try:
+                    # Получаем performance логи
+                    logs = self.driver.get_log("performance")
+
+                    # Ищем активные XHR запросы
+                    active_requests = []
+                    for entry in logs:
+                        try:
+                            msg = json.loads(entry["message"])["message"]
+                            if msg.get("method") == "Network.requestWillBeSent":
+                                url = msg["params"]["request"]["url"]
+                                request_id = msg["params"]["requestId"]
+
+                                # Фильтруем только запросы к отчетам
+                                if any(keyword in url.lower() for keyword in ["report", "reportviewer", "axd"]):
+                                    active_requests.append({
+                                        "id": request_id,
+                                        "url": url,
+                                        "time": msg["params"]["timestamp"]
+                                    })
+                                    last_activity_time = time.time()
+
+                        except Exception:
+                            continue
+
+                    # Если нет активных запросов и прошло достаточно времени с последней активности
+                    if not active_requests and (time.time() - last_activity_time) > 3:
+                        self.logger.info("✅ XHR запросы завершены, отчет загружен")
+                        return True
+
+                    # Показываем прогресс
+                    if active_requests:
+                        self.logger.info(f"⏳ Активных XHR запросов: {len(active_requests)}")
+                        for req in active_requests[:2]:  # Показываем первые 2
+                            self.logger.info(f"   • {req['url'][:80]}...")
+
+                    time.sleep(1)
+
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Ошибка при анализе XHR: {e}")
+                    time.sleep(1)
+
+            self.logger.warning(f"⚠️ Timeout ожидания XHR ({timeout}с), продолжаем...")
+            return False
+
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при ожидании XHR: {e}")
             return False

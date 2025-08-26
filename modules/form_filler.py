@@ -242,15 +242,38 @@ class FormFiller:
                 # Ждем применения изменений
                 time.sleep(1)
 
-                # 3. Теперь выбираем нужный чекбокс
-                checkbox_selector = self.form_elements.get_dropdown_selector('reason_checkbox')
-                if not checkbox_selector:
-                    self.logger.error("❌ Селектор чекбокса не найден")
-                    return False
+                # 3. Теперь выбираем нужный чекбокс по label (более надежно)
+                self.logger.info("🔍 Ищем чекбокс 'Низкая скорость в 3G/4G' по label...")
 
-                checkbox = self.iframe_handler.find_element_in_iframe(checkbox_selector)
+                # Пробуем найти по label тексту
+                checkbox = None
+                try:
+                    # Ищем label с нужным текстом
+                    label_xpath = "//label[contains(text(), 'Низкая скорость в 3G/4G') or contains(text(), 'Интернет >> Низкая скорость')]"
+                    label = self.driver.find_element("xpath", label_xpath)
+
+                    # Получаем for атрибут и ищем соответствующий input
+                    for_attr = label.get_attribute("for")
+                    if for_attr:
+                        checkbox = self.driver.find_element("id", for_attr)
+                        self.logger.info(f"✅ Чекбокс найден по label с for='{for_attr}'")
+                    else:
+                        # Если нет for, ищем input рядом с label
+                        checkbox = label.find_element("xpath", "./following-sibling::input[@type='checkbox']")
+                        self.logger.info("✅ Чекбокс найден рядом с label")
+
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Поиск по label не удался: {e}")
+
+                    # Fallback: используем старый метод
+                    checkbox_selector = self.form_elements.get_dropdown_selector('reason_checkbox')
+                    if checkbox_selector:
+                        checkbox = self.iframe_handler.find_element_in_iframe(checkbox_selector)
+                        if checkbox:
+                            self.logger.info("✅ Чекбокс найден через fallback селектор")
+
                 if not checkbox:
-                    self.logger.error("❌ Чекбокс 'Низкая скорость в 3G/4G' не найден")
+                    self.logger.error("❌ Чекбокс 'Низкая скорость в 3G/4G' не найден ни одним способом")
                     return False
 
                 # Проверяем, не выбран ли уже чекбокс
