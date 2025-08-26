@@ -54,7 +54,7 @@ class IframeHandler:
                 # По умолчанию используем CSS селектор
                 by = By.CSS_SELECTOR
                 selector_value = selector
-            
+
             element = WebDriverWait(self.driver, timeout).until(
                 EC.presence_of_element_located((by, selector_value))
             )

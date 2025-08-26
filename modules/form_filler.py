@@ -253,10 +253,34 @@ class FormFiller:
                     self.logger.info("🗑️ Снимаем все галочки через 'Выделить все'...")
                     select_all_checkbox.click()
 
-                # Ждем применения изменений
-                time.sleep(1)
+                                # Ждем применения изменений и исчезновения модального окна
+                self.logger.info("⏳ Ждем применения изменений и исчезновения модального окна...")
+                
+                # Ждем исчезновения модального окна ожидания
+                wait_time = 10
+                start_time = time.time()
+                while time.time() - start_time < wait_time:
+                    try:
+                        # Ищем модальное окно ожидания
+                        modal = self.driver.find_element("xpath", 
+                            "//div[contains(@class, 'wait-indicator-dialog') and contains(@class, 'in')]")
+                        if modal.is_displayed():
+                            self.logger.info("⏳ Модальное окно ожидания активно, ждем...")
+                            time.sleep(0.5)
+                            continue
+                        else:
+                            self.logger.info("✅ Модальное окно ожидания исчезло")
+                            break
+                    except:
+                        # Модальное окно не найдено - значит исчезло
+                        self.logger.info("✅ Модальное окно ожидания не найдено")
+                        break
+                
+                # Дополнительная задержка для стабилизации
+                time.sleep(2)
+                self.logger.info("✅ Готовы к выбору чекбокса")
 
-                                                # 3. Теперь выбираем нужный чекбокс (пробуем label, затем fallback)
+                # 3. Теперь выбираем нужный чекбокс (пробуем label, затем fallback)
                 self.logger.info("🔍 Ищем чекбокс 'Низкая скорость в 3G/4G'...")
 
                 # Пробуем найти по label тексту (тихо, без ошибок в логах)
@@ -302,7 +326,7 @@ class FormFiller:
 
                 except Exception as e:
                     self.logger.warning(f"⚠️ Попытка 1 не удалась: {e}")
-                    
+
                     # Диагностика: показываем все доступные label'ы в iframe
                     try:
                         self.logger.info("🔍 Диагностика: ищем все label'ы в iframe...")
@@ -320,7 +344,7 @@ class FormFiller:
                                         label_texts.append(text)
                                 except:
                                     pass
-                            
+
                             if label_texts:
                                 self.logger.info(f"📋 Найденные label'ы в iframe: {label_texts}")
                             else:
@@ -329,7 +353,7 @@ class FormFiller:
                             self.logger.info("📋 Не удалось найти label'ы в iframe")
                     except Exception as diag_e:
                         self.logger.warning(f"⚠️ Диагностика не удалась: {diag_e}")
-                    
+
                     self.logger.info("🔄 Переходим к fallback механизму...")
 
                     # Fallback: используем старый метод
@@ -375,7 +399,33 @@ class FormFiller:
                 # Проверяем, не выбран ли уже чекбокс
                 if not checkbox.is_selected():
                     self.logger.info("✅ Выбираем чекбокс 'Низкая скорость в 3G/4G'...")
-                    checkbox.click()
+                    
+                    # Проверяем что нет блокирующих модальных окон
+                    try:
+                        blocking_modal = self.driver.find_element("xpath", 
+                            "//div[contains(@class, 'modal') and contains(@class, 'in') and @style*='display: block']")
+                        if blocking_modal.is_displayed():
+                            self.logger.warning("⚠️ Обнаружено блокирующее модальное окно, ждем исчезновения...")
+                            time.sleep(3)  # Ждем исчезновения
+                    except:
+                        # Модальное окно не найдено - можно кликать
+                        pass
+                    
+                    # Пробуем клик с проверкой на блокировку
+                    try:
+                        checkbox.click()
+                        self.logger.info("✅ Чекбокс успешно выбран")
+                    except Exception as click_error:
+                        if "element click intercepted" in str(click_error):
+                            self.logger.warning("⚠️ Клик заблокирован, пробуем JavaScript клик...")
+                            try:
+                                self.driver.execute_script("arguments[0].click();", checkbox)
+                                self.logger.info("✅ Чекбокс выбран через JavaScript")
+                            except Exception as js_error:
+                                self.logger.error(f"❌ JavaScript клик тоже не удался: {js_error}")
+                                raise js_error
+                        else:
+                            raise click_error
                 else:
                     self.logger.info("✅ Чекбокс 'Низкая скорость в 3G/4G' уже выбран")
 
