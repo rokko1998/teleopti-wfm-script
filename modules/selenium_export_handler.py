@@ -383,43 +383,60 @@ class SeleniumExportHandler:
             return False
 
     def _wait_for_report_loaded_by_elements(self, timeout=60):
-        """Ждать загрузки отчета по появлению элементов на странице"""
+        """Ждать загрузки отчета по структурным узлам ReportViewer и состоянию ASP.NET"""
         try:
-            self.logger.info("🔍 Ждем загрузки отчета по элементам страницы...")
-
+            self.logger.info("🔍 Ждем загрузки отчета по структурным узлам ReportViewer...")
+            
             start_time = time.time()
-
+            
             while time.time() - start_time < timeout:
                 try:
                     # Ищем признаки загруженного отчета
                     indicators = []
-
-                    # 1. Проверяем наличие кнопки экспорта
+                    
+                    # 1. Проверяем состояние ASP.NET partial postback
                     try:
-                        export_button = self.driver.find_element("xpath", "//a[contains(@onclick, 'exportReport') or contains(@onclick, 'EXCEL')]")
-                        if export_button.is_displayed():
-                            indicators.append("✅ Кнопка экспорта найдена")
-                    except:
-                        pass
-
-                    # 2. Проверяем наличие данных в отчете (таблицы, строки)
-                    try:
-                        data_rows = self.driver.find_elements("xpath", "//table//tr[position()>1]")  # Строки с данными
-                        if len(data_rows) > 0:
-                            indicators.append(f"✅ Данные в отчете: {len(data_rows)} строк")
-                    except:
-                        pass
-
-                    # 3. Проверяем отсутствие индикатора загрузки
-                    try:
-                        loading_indicator = self.driver.find_element("xpath", "//*[contains(text(), 'Loading') or contains(text(), 'Загрузка') or contains(@class, 'loading')]")
-                        if loading_indicator.is_displayed():
-                            indicators.append("⏳ Индикатор загрузки активен")
+                        is_async_postback = self.driver.execute_script(
+                            "return typeof Sys !== 'undefined' && Sys.WebForms && Sys.WebForms.PageRequestManager && " +
+                            "Sys.WebForms.PageRequestManager.getInstance().get_isInAsyncPostBack()"
+                        )
+                        if is_async_postback is False:
+                            indicators.append("✅ ASP.NET partial postback завершен")
+                        elif is_async_postback is True:
+                            indicators.append("⏳ ASP.NET partial postback активен")
                             time.sleep(1)
                             continue
+                        else:
+                            indicators.append("ℹ️ ASP.NET не обнаружен")
+                    except:
+                        indicators.append("ℹ️ ASP.NET не обнаружен")
+                    
+                    # 2. Проверяем структурные узлы ReportViewer (без динамических классов)
+                    try:
+                        # Ищем рендер-контейнер отчета с role="presentation"
+                        report_table = self.driver.find_element("xpath", 
+                            "//div[@id='ReportViewerControl']//table[@role='presentation']")
+                        if report_table and report_table.is_displayed():
+                            # Проверяем размеры
+                            size = report_table.size
+                            if size['width'] > 0 and size['height'] > 0:
+                                indicators.append(f"✅ Рендер-контейнер отчета найден ({size['width']}x{size['height']})")
+                            else:
+                                indicators.append("⏳ Рендер-контейнер отчета загружается")
+                                time.sleep(1)
+                                continue
                     except:
                         pass
-
+                    
+                    # 3. Проверяем навигацию отчета
+                    try:
+                        nav_div = self.driver.find_element("xpath", 
+                            "//div[@id='ReportViewerControl']//div[@role='navigation']")
+                        if nav_div and nav_div.is_displayed():
+                            indicators.append("✅ Навигация отчета готова")
+                    except:
+                        pass
+                    
                     # 4. Проверяем готовность страницы
                     ready_state = self.driver.execute_script("return document.readyState")
                     if ready_state == "complete":
@@ -428,23 +445,23 @@ class SeleniumExportHandler:
                         indicators.append(f"⏳ Состояние страницы: {ready_state}")
                         time.sleep(1)
                         continue
-
+                    
                     # Если нашли все признаки загрузки
                     if len(indicators) >= 2:  # Минимум 2 признака
-                        self.logger.info("✅ Отчет загружен по элементам:")
+                        self.logger.info("✅ Отчет загружен по структурным узлам:")
                         for indicator in indicators:
                             self.logger.info(f"   {indicator}")
                         return True
-
+                    
                     time.sleep(1)
-
+                    
                 except Exception as e:
                     self.logger.warning(f"⚠️ Ошибка при проверке элементов: {e}")
                     time.sleep(1)
-
+            
             self.logger.warning(f"⚠️ Timeout ожидания загрузки отчета ({timeout}с)")
             return False
-
+            
         except Exception as e:
             self.logger.error(f"❌ Ошибка при ожидании загрузки отчета: {e}")
             return False
