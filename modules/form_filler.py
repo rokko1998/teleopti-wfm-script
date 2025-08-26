@@ -248,9 +248,18 @@ class FormFiller:
                 # Пробуем найти по label тексту
                 checkbox = None
                 try:
-                    # Ищем label с нужным текстом
-                    label_xpath = "//label[contains(text(), 'Низкая скорость в 3G/4G') or contains(text(), 'Интернет >> Низкая скорость')]"
+                    # Ищем label с точным текстом (строго по названию)
+                    label_xpath = """//label[
+                        contains(text(), 'Интернет >> Низкая скорость в 3G/4G') or
+                        contains(., 'Интернет >> Низкая скорость в 3G/4G') or
+                        contains(text(), 'Интернет&nbsp;&gt;&gt;&nbsp;Низкая&nbsp;скорость&nbsp;в&nbsp;3G/4G') or
+                        contains(., 'Интернет&nbsp;&gt;&gt;&nbsp;Низкая&nbsp;скорость&nbsp;в&nbsp;3G/4G')
+                    ]"""
                     label = self.driver.find_element("xpath", label_xpath)
+
+                    # Проверяем что нашли именно нужный label
+                    label_text = label.text.strip()
+                    self.logger.info(f"✅ Найден label: '{label_text}'")
 
                     # Получаем for атрибут и ищем соответствующий input
                     for_attr = label.get_attribute("for")
@@ -264,6 +273,22 @@ class FormFiller:
 
                 except Exception as e:
                     self.logger.warning(f"⚠️ Поиск по label не удался: {e}")
+
+                    # Диагностика: показываем все доступные label для отладки
+                    try:
+                        all_labels = self.driver.find_elements("xpath", "//label")
+                        internet_labels = []
+                        for lbl in all_labels:
+                            text = lbl.text.strip()
+                            if 'интернет' in text.lower() or 'скорость' in text.lower():
+                                internet_labels.append(text[:100])  # Первые 100 символов
+
+                        if internet_labels:
+                            self.logger.info(f"🔍 Найдены label с 'интернет' или 'скорость': {internet_labels[:3]}")
+                        else:
+                            self.logger.info("🔍 Label с 'интернет' или 'скорость' не найдены")
+                    except Exception as diag_e:
+                        self.logger.warning(f"⚠️ Диагностика не удалась: {diag_e}")
 
                     # Fallback: используем старый метод
                     checkbox_selector = self.form_elements.get_dropdown_selector('reason_checkbox')
