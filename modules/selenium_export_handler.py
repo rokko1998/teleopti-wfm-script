@@ -309,10 +309,8 @@ class SeleniumExportHandler:
                 self.driver.get_log("performance")
                 self.logger.info("✅ Performance логи доступны")
             except Exception:
-                self.logger.info("ℹ️ Performance логи недоступны, используем расширенную задержку")
-                # Увеличиваем задержку для гарантии загрузки отчета
-                time.sleep(15)  # 15 секунд вместо 5
-                return True
+                self.logger.info("ℹ️ Performance логи недоступны, используем программные признаки загрузки")
+                return self._wait_for_report_loaded_by_elements(timeout)
 
             start_time = time.time()
             last_activity_time = start_time
@@ -365,4 +363,71 @@ class SeleniumExportHandler:
 
         except Exception as e:
             self.logger.error(f"❌ Ошибка при ожидании XHR: {e}")
+            return False
+
+    def _wait_for_report_loaded_by_elements(self, timeout=60):
+        """Ждать загрузки отчета по появлению элементов на странице"""
+        try:
+            self.logger.info("🔍 Ждем загрузки отчета по элементам страницы...")
+            
+            start_time = time.time()
+            
+            while time.time() - start_time < timeout:
+                try:
+                    # Ищем признаки загруженного отчета
+                    indicators = []
+                    
+                    # 1. Проверяем наличие кнопки экспорта
+                    try:
+                        export_button = self.driver.find_element("xpath", "//a[contains(@onclick, 'exportReport') or contains(@onclick, 'EXCEL')]")
+                        if export_button.is_displayed():
+                            indicators.append("✅ Кнопка экспорта найдена")
+                    except:
+                        pass
+                    
+                    # 2. Проверяем наличие данных в отчете (таблицы, строки)
+                    try:
+                        data_rows = self.driver.find_elements("xpath", "//table//tr[position()>1]")  # Строки с данными
+                        if len(data_rows) > 0:
+                            indicators.append(f"✅ Данные в отчете: {len(data_rows)} строк")
+                    except:
+                        pass
+                    
+                    # 3. Проверяем отсутствие индикатора загрузки
+                    try:
+                        loading_indicator = self.driver.find_element("xpath", "//*[contains(text(), 'Loading') or contains(text(), 'Загрузка') or contains(@class, 'loading')]")
+                        if loading_indicator.is_displayed():
+                            indicators.append("⏳ Индикатор загрузки активен")
+                            time.sleep(1)
+                            continue
+                    except:
+                        pass
+                    
+                    # 4. Проверяем готовность страницы
+                    ready_state = self.driver.execute_script("return document.readyState")
+                    if ready_state == "complete":
+                        indicators.append("✅ Страница полностью загружена")
+                    else:
+                        indicators.append(f"⏳ Состояние страницы: {ready_state}")
+                        time.sleep(1)
+                        continue
+                    
+                    # Если нашли все признаки загрузки
+                    if len(indicators) >= 2:  # Минимум 2 признака
+                        self.logger.info("✅ Отчет загружен по элементам:")
+                        for indicator in indicators:
+                            self.logger.info(f"   {indicator}")
+                        return True
+                    
+                    time.sleep(1)
+                    
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Ошибка при проверке элементов: {e}")
+                    time.sleep(1)
+            
+            self.logger.warning(f"⚠️ Timeout ожидания загрузки отчета ({timeout}с)")
+            return False
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при ожидании загрузки отчета: {e}")
             return False

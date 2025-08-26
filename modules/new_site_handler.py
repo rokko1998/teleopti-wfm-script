@@ -68,8 +68,12 @@ class NewSiteHandler:
 
             # 6. Экспортируем в Excel (пробуем "боевой" сценарий, затем fallback)
             self.logger.info("📤 Пробуем экспорт через 'боевой' сценарий...")
-            if self.export_excel_by_click(wait_time=wait_time):
-                self.logger.info("✅ Экспорт через 'боевой' сценарий успешен")
+            excel_result = self.export_excel_by_click(wait_time=wait_time)
+            
+            if excel_result and isinstance(excel_result, str) and excel_result.endswith('.xlsx'):
+                self.logger.info(f"✅ Экспорт через 'боевой' сценарий успешен: {excel_result}")
+                # Файл скачался, останавливаемся здесь
+                return True
             else:
                 self.logger.warning("⚠️ 'Боевой' сценарий не сработал, пробуем fallback...")
                 if not self.excel_exporter.export_to_excel(wait_time=wait_time):
@@ -117,7 +121,7 @@ class NewSiteHandler:
 
             if result:
                 self.logger.info(f"🎉 Экспорт Excel завершен успешно: {result}")
-                return True
+                return result  # Возвращаем путь к файлу
             else:
                 self.logger.error("❌ Экспорт Excel не удался")
                 return False

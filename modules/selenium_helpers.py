@@ -193,16 +193,16 @@ def get_driver(headless: bool = True) -> webdriver.Chrome:
                     };
                 })();
             """)
-            
+
             # Дополнительная Python фильтрация
             import sys
             import io
-            
+
             class FilteredStderr:
                 def __init__(self, original_stderr):
                     self.original_stderr = original_stderr
                     self.buffer = ""
-                
+
                 def write(self, text):
                     # Фильтруем Google логи
                     if any(noise in text for noise in [
@@ -213,13 +213,13 @@ def get_driver(headless: bool = True) -> webdriver.Chrome:
                     ]):
                         return
                     self.original_stderr.write(text)
-                
+
                 def flush(self):
                     self.original_stderr.flush()
-            
+
             # Применяем фильтр к stderr
             sys.stderr = FilteredStderr(sys.stderr)
-            
+
             logger.info("✅ Google логи отключены (JavaScript + Python)")
         except Exception as e:
             logger.warning(f"⚠️ Не удалось отключить Google логи: {e}")
