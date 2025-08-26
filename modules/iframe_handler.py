@@ -38,10 +38,25 @@ class IframeHandler:
             return False
 
     def find_element_in_iframe(self, selector, timeout=10):
-        """Найти элемент в iframe по CSS селектору"""
+        """Найти элемент в iframe по селектору (CSS или XPath)"""
         try:
+            # Если передан кортеж (тип, селектор)
+            if isinstance(selector, tuple) and len(selector) == 2:
+                selector_type, selector_value = selector
+                if selector_type.lower() == "xpath":
+                    by = By.XPATH
+                elif selector_type.lower() == "css":
+                    by = By.CSS_SELECTOR
+                else:
+                    self.logger.error(f"❌ Неподдерживаемый тип селектора: {selector_type}")
+                    return None
+            else:
+                # По умолчанию используем CSS селектор
+                by = By.CSS_SELECTOR
+                selector_value = selector
+            
             element = WebDriverWait(self.driver, timeout).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, selector))
+                EC.presence_of_element_located((by, selector_value))
             )
             return element
         except Exception as e:

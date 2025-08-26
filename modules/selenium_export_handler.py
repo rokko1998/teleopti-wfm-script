@@ -280,7 +280,7 @@ class SeleniumExportHandler:
             target = self.wait_for_download(download_dir, r".*\.xlsx$", timeout=overall_timeout)
             if target:
                 self.logger.info(f"🎉 Экспорт завершен успешно: {target}")
-                return target
+                return str(target.absolute())  # Возвращаем абсолютный путь как строку
 
             # 6) если файла нет — просто возвращаем None, не засоряем логи
             self.logger.warning("⚠️ Файл не появился в срок")

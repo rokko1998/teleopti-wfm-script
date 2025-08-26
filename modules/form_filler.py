@@ -263,7 +263,7 @@ class FormFiller:
                 checkbox = None
                 try:
                     self.logger.info("🔍 Попытка 1: поиск по точному тексту label...")
-                    
+
                     # Ищем label с ТОЧНЫМ текстом (строго по названию) В IFRAME
                     label_xpath = """//label[
                         normalize-space(text()) = 'Интернет >> Низкая скорость в 3G/4G' or
@@ -271,9 +271,9 @@ class FormFiller:
                         normalize-space(text()) = 'Интернет&nbsp;&gt;&gt;&nbsp;Низкая&nbsp;скорость&nbsp;в&nbsp;3G/4G' or
                         normalize-space(.) = 'Интернет&nbsp;&gt;&gt;&nbsp;Низкая&nbsp;скорость&nbsp;в&nbsp;3G/4G'
                     ]"""
-                    
+
                     self.logger.info(f"🔍 XPath для поиска: {label_xpath}")
-                    
+
                     # Ищем через iframe_handler, а не через driver напрямую
                     label = self.iframe_handler.find_element_in_iframe(("xpath", label_xpath))
                     if not label:
@@ -302,6 +302,34 @@ class FormFiller:
 
                 except Exception as e:
                     self.logger.warning(f"⚠️ Попытка 1 не удалась: {e}")
+                    
+                    # Диагностика: показываем все доступные label'ы в iframe
+                    try:
+                        self.logger.info("🔍 Диагностика: ищем все label'ы в iframe...")
+                        all_labels = self.iframe_handler.find_element_in_iframe(
+                            ("xpath", "//label")
+                        )
+                        if all_labels:
+                            # Получаем все label'ы
+                            labels = self.driver.find_elements("xpath", ".//label")
+                            label_texts = []
+                            for lbl in labels[:10]:  # Показываем первые 10
+                                try:
+                                    text = lbl.text.strip()
+                                    if text and len(text) > 10:  # Только непустые и длинные
+                                        label_texts.append(text)
+                                except:
+                                    pass
+                            
+                            if label_texts:
+                                self.logger.info(f"📋 Найденные label'ы в iframe: {label_texts}")
+                            else:
+                                self.logger.info("📋 Label'ы не найдены или пустые")
+                        else:
+                            self.logger.info("📋 Не удалось найти label'ы в iframe")
+                    except Exception as diag_e:
+                        self.logger.warning(f"⚠️ Диагностика не удалась: {diag_e}")
+                    
                     self.logger.info("🔄 Переходим к fallback механизму...")
 
                     # Fallback: используем старый метод
