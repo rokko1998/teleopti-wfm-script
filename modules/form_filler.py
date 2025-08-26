@@ -235,7 +235,7 @@ class FormFiller:
                 select_all_checkbox = self.iframe_handler.find_element_in_iframe(select_all_selector)
                 if not select_all_checkbox:
                     self.logger.warning("⚠️ Чекбокс 'Выделить все' не найден по селектору, пробуем найти по тексту...")
-                    
+
                     # Fallback: ищем по тексту "Выделить все"
                     try:
                         select_all_checkbox = self.iframe_handler.find_element_in_iframe(
@@ -303,9 +303,36 @@ class FormFiller:
                     # Fallback: используем старый метод
                     checkbox_selector = self.form_elements.get_dropdown_selector('reason_checkbox')
                     if checkbox_selector:
+                        self.logger.info(f"🔄 Fallback: ищем по селектору '{checkbox_selector}'")
                         checkbox = self.iframe_handler.find_element_in_iframe(checkbox_selector)
                         if checkbox:
-                            self.logger.info("✅ Чекбокс найден через fallback селектор")
+                            # Проверяем что нашли правильный чекбокс
+                            try:
+                                # Ищем label для этого чекбокса
+                                checkbox_id = checkbox.get_attribute("id")
+                                if checkbox_id:
+                                    label = self.iframe_handler.find_element_in_iframe(
+                                        ("xpath", f"//label[@for='{checkbox_id}']")
+                                    )
+                                    if label:
+                                        label_text = label.text.strip()
+                                        self.logger.info(f"✅ Fallback: найден чекбокс с label '{label_text}'")
+                                        if "Интернет" in label_text and "Низкая скорость" in label_text:
+                                            self.logger.info("✅ Это правильный чекбокс!")
+                                        else:
+                                            self.logger.warning(f"⚠️ Fallback нашел неправильный чекбокс: '{label_text}'")
+                                            checkbox = None
+                                    else:
+                                        self.logger.info(f"✅ Fallback: найден чекбокс с ID '{checkbox_id}' (без label)")
+                                else:
+                                    self.logger.info("✅ Fallback: найден чекбокс без ID")
+                            except Exception as e:
+                                self.logger.warning(f"⚠️ Ошибка при проверке fallback чекбокса: {e}")
+                                checkbox = None
+                        else:
+                            self.logger.warning("⚠️ Fallback селектор не нашел чекбокс")
+                    else:
+                        self.logger.warning("⚠️ Fallback селектор не определен")
 
                 if not checkbox:
                     self.logger.error("❌ Чекбокс 'Низкая скорость в 3G/4G' не найден ни одним способом")

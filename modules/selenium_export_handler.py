@@ -21,10 +21,18 @@ class SeleniumExportHandler:
     def __init__(self, driver, logger_instance, download_dir=None):
         self.driver = driver
         self.logger = logger_instance
-        self.download_dir = Path(download_dir) if download_dir else Path.home() / "Downloads"
-
+        
+        # Используем папку проекта по умолчанию, а не Windows Downloads
+        if download_dir:
+            self.download_dir = Path(download_dir)
+        else:
+            # Папка downloads в корне проекта
+            project_root = Path(__file__).resolve().parent.parent
+            self.download_dir = project_root / "downloads"
+        
         # Создаем директорию для загрузок если её нет
         self.download_dir.mkdir(parents=True, exist_ok=True)
+        self.logger.info(f"📁 Директория загрузок: {self.download_dir}")
 
     def _dispatch_click_js(self, driver, el):
         """Отправить полную последовательность событий клика через JavaScript"""
@@ -386,14 +394,14 @@ class SeleniumExportHandler:
         """Ждать загрузки отчета по структурным узлам ReportViewer и состоянию ASP.NET"""
         try:
             self.logger.info("🔍 Ждем загрузки отчета по структурным узлам ReportViewer...")
-            
+
             start_time = time.time()
-            
+
             while time.time() - start_time < timeout:
                 try:
                     # Ищем признаки загруженного отчета
                     indicators = []
-                    
+
                     # 1. Проверяем состояние ASP.NET partial postback
                     try:
                         is_async_postback = self.driver.execute_script(
@@ -410,12 +418,13 @@ class SeleniumExportHandler:
                             indicators.append("ℹ️ ASP.NET не обнаружен")
                     except:
                         indicators.append("ℹ️ ASP.NET не обнаружен")
-                    
+
                     # 2. Проверяем структурные узлы ReportViewer (без динамических классов)
                     try:
                         # Ищем рендер-контейнер отчета с role="presentation"
-                        report_table = self.driver.find_element("xpath", 
-                            "//div[@id='ReportViewerControl']//table[@role='presentation']")
+                        # Используем поиск в текущем контексте (iframe)
+                        report_table = self.driver.find_element("xpath",
+                            ".//div[@id='ReportViewerControl']//table[@role='presentation']")
                         if report_table and report_table.is_displayed():
                             # Проверяем размеры
                             size = report_table.size
@@ -427,16 +436,16 @@ class SeleniumExportHandler:
                                 continue
                     except:
                         pass
-                    
+
                     # 3. Проверяем навигацию отчета
                     try:
-                        nav_div = self.driver.find_element("xpath", 
-                            "//div[@id='ReportViewerControl']//div[@role='navigation']")
+                        nav_div = self.driver.find_element("xpath",
+                            ".//div[@id='ReportViewerControl']//div[@role='navigation']")
                         if nav_div and nav_div.is_displayed():
                             indicators.append("✅ Навигация отчета готова")
                     except:
                         pass
-                    
+
                     # 4. Проверяем готовность страницы
                     ready_state = self.driver.execute_script("return document.readyState")
                     if ready_state == "complete":
@@ -445,23 +454,23 @@ class SeleniumExportHandler:
                         indicators.append(f"⏳ Состояние страницы: {ready_state}")
                         time.sleep(1)
                         continue
-                    
+
                     # Если нашли все признаки загрузки
                     if len(indicators) >= 2:  # Минимум 2 признака
                         self.logger.info("✅ Отчет загружен по структурным узлам:")
                         for indicator in indicators:
                             self.logger.info(f"   {indicator}")
                         return True
-                    
+
                     time.sleep(1)
-                    
+
                 except Exception as e:
                     self.logger.warning(f"⚠️ Ошибка при проверке элементов: {e}")
                     time.sleep(1)
-            
+
             self.logger.warning(f"⚠️ Timeout ожидания загрузки отчета ({timeout}с)")
             return False
-            
+
         except Exception as e:
             self.logger.error(f"❌ Ошибка при ожидании загрузки отчета: {e}")
             return False
