@@ -191,6 +191,9 @@ def main():
             logger.error("❌ Не удалось открыть сайт")
             return 1
 
+    except KeyboardInterrupt:
+        logger.info("🛑 Получен сигнал прерывания (Ctrl+C)")
+        return 0
     except Exception as e:
         logger.error(f"❌ Критическая ошибка: {e}")
         return 1

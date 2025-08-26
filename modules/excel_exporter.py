@@ -2,6 +2,7 @@
 Модуль для экспорта отчета в Excel
 """
 
+import signal
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -18,9 +19,49 @@ class ExcelExporter:
         self.driver = driver
         self.logger = logger
         self.download_dir = download_dir or os.path.expanduser("~/Downloads")
-        
+        self._interrupted = False  # Флаг прерывания
+
         # Отключаем Google логи в консоли
         self._disable_google_logs()
+
+        # Устанавливаем обработчик сигналов
+        self._setup_signal_handlers()
+
+    def _setup_signal_handlers(self):
+        """Настроить обработчики сигналов для корректного завершения"""
+        def signal_handler(signum, frame):
+            self.logger.info(f"🛑 Получен сигнал {signum}, прерываем работу...")
+            self._interrupted = True
+
+        # Обрабатываем SIGINT (Ctrl+C) и SIGTERM
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+
+    def _is_browser_alive(self):
+        """Проверить, что браузер еще работает"""
+        try:
+            # Пробуем получить текущий URL - если браузер закрыт, это вызовет исключение
+            self.driver.current_url
+            return True
+        except:
+            return False
+
+    def _check_interruption(self):
+        """Проверить, не было ли прерывания работы"""
+        try:
+            # Проверяем флаг прерывания
+            if self._interrupted:
+                self.logger.info("🛑 Работа прервана пользователем")
+                return True
+
+            # Проверяем, что браузер еще работает
+            if not self._is_browser_alive():
+                self.logger.warning("⚠️ Браузер закрыт, прерываем ожидание")
+                return True
+
+            return False
+        except:
+            return True
 
     def _disable_google_logs(self):
         """Отключить Google логи в консоли"""
@@ -80,6 +121,11 @@ class ExcelExporter:
             max_checks = timeout // check_interval
 
             for check_num in range(max_checks):
+                # Проверяем, не было ли прерывания
+                if self._check_interruption():
+                    self.logger.info("🛑 Ожидание прервано пользователем")
+                    return False
+
                 self.logger.info(f"🔍 Проверка {check_num + 1}/{max_checks} - ищем кнопку экспорта...")
 
                 # Сначала пробуем найти по тексту (более надежно)
@@ -99,6 +145,11 @@ class ExcelExporter:
                 ]
 
                 for selector in export_selectors:
+                    # Проверяем прерывание перед каждой попыткой
+                    if self._check_interruption():
+                        self.logger.info("🛑 Ожидание прервано пользователем")
+                        return False
+
                     try:
                         export_button = self.driver.find_element(By.CSS_SELECTOR, selector)
                         if export_button.is_enabled():  # Убрали проверку is_displayed()
@@ -111,7 +162,13 @@ class ExcelExporter:
                 # Если кнопка не найдена, ждем и проверяем снова
                 if check_num < max_checks - 1:  # Не ждем после последней проверки
                     self.logger.info(f"⏳ Кнопка экспорта не найдена, ждем {check_interval} секунд...")
-                    time.sleep(check_interval)
+
+                    # Разбиваем ожидание на короткие интервалы для проверки прерывания
+                    for i in range(check_interval):
+                        if self._check_interruption():
+                            self.logger.info("🛑 Ожидание прервано пользователем")
+                            return False
+                        time.sleep(1)
 
             self.logger.error(f"❌ Отчет не загрузился за {timeout} секунд")
             return False
@@ -446,7 +503,7 @@ class ExcelExporter:
         try:
             import glob
             import os
-            
+
             for pattern in patterns:
                 files = glob.glob(os.path.join(download_dir, f"*{pattern}"))
                 for file_path in files:
@@ -455,7 +512,7 @@ class ExcelExporter:
                         self.logger.info(f"🗑️ Удален старый файл: {os.path.basename(file_path)}")
                     except Exception as e:
                         self.logger.warning(f"⚠️ Не удалось удалить {file_path}: {e}")
-                        
+
         except Exception as e:
             self.logger.warning(f"⚠️ Ошибка при очистке старых загрузок: {e}")
 
@@ -465,36 +522,46 @@ class ExcelExporter:
             import glob
             import os
             import re
-            
+
             self.logger.info(f"⏳ Ждем появления файла по паттерну: {pattern}")
-            
+
             start_time = time.time()
             while time.time() - start_time < timeout:
+                # Проверяем, не было ли прерывания
+                if self._check_interruption():
+                    self.logger.info("🛑 Ожидание загрузки прервано пользователем")
+                    return None
+
                 # Ищем файлы по паттерну
                 files = glob.glob(os.path.join(download_dir, "*"))
                 matching_files = [f for f in files if re.match(pattern, os.path.basename(f))]
-                
+
                 # Исключаем .crdownload файлы
                 completed_files = [f for f in matching_files if not f.endswith('.crdownload')]
-                
+
                 if completed_files:
                     # Берем самый новый файл
                     newest_file = max(completed_files, key=os.path.getctime)
                     self.logger.info(f"✅ Файл найден: {os.path.basename(newest_file)}")
                     return newest_file
-                
+
                 # Проверяем .crdownload файлы для прогресса
                 crdownload_files = [f for f in matching_files if f.endswith('.crdownload')]
                 if crdownload_files:
                     newest_crdownload = max(crdownload_files, key=os.path.getctime)
                     size = os.path.getsize(newest_crdownload)
                     self.logger.info(f"📥 Загрузка в процессе: {os.path.basename(newest_crdownload)} ({size} байт)")
-                
-                time.sleep(1)
-            
+
+                # Разбиваем ожидание на короткие интервалы для проверки прерывания
+                for i in range(5):  # Проверяем каждые 5 секунд
+                    if self._check_interruption():
+                        self.logger.info("🛑 Ожидание загрузки прервано пользователем")
+                        return None
+                    time.sleep(1)
+
             self.logger.error(f"❌ Файл не появился за {timeout} секунд")
             return None
-            
+
         except Exception as e:
             self.logger.error(f"❌ Ошибка при ожидании загрузки: {e}")
             return None
@@ -503,25 +570,25 @@ class ExcelExporter:
         """Вызов $find('ReportViewerControl').exportReport(format_code) с ожиданием готовности."""
         try:
             self.logger.info(f"🚀 Прямой экспорт через ReportViewer API: {format_code}")
-            
+
             # Обязательно проверяем iframe до JS
             self.check_and_switch_iframe()
-            
+
             # Ждём готовности API
             wait = WebDriverWait(self.driver, 30)
             wait.until(lambda d: d.execute_script("return !!(window.Sys && Sys.Application);"))
             wait.until(lambda d: d.execute_script("return !!(window.$find && $find('ReportViewerControl'));"))
-            
+
             # Запускаем экспорт
             self.logger.info(f"💾 Запускаем экспорт в формате {format_code}...")
             self.driver.execute_script(
                 "$find('ReportViewerControl').exportReport(arguments[0]);",
                 format_code
             )
-            
+
             self.logger.info("✅ Экспорт запущен через ReportViewer API")
             return True
-            
+
         except Exception as e:
             self.logger.warning(f"⚠️ ReportViewer API недоступен: {e}")
             return False
@@ -530,9 +597,9 @@ class ExcelExporter:
         """Клик по пункту меню Excel (безопасный способ)"""
         try:
             self.logger.info("🖱️ Пытаемся кликнуть по пункту меню Excel...")
-            
+
             self.check_and_switch_iframe()
-            
+
             # Раскрыть экспорт-меню
             toolbar = self.driver.find_element(By.ID, "ReportViewerControl")
             toggle = None
@@ -547,7 +614,7 @@ class ExcelExporter:
             else:
                 self.logger.warning("⚠️ Не удалось найти кнопку раскрытия меню экспорта")
                 return False
-            
+
             # Найти пункт Excel среди ActiveLink
             def _find_excel(drv):
                 nodes = drv.find_elements(By.CSS_SELECTOR, "a.ActiveLink")
@@ -557,20 +624,20 @@ class ExcelExporter:
                         # меню может быть абсолютным positioned; кликаем через JS
                         return n
                 return False
-            
+
             try:
                 excel_node = WebDriverWait(self.driver, 10).until(_find_excel)
                 self.logger.info("✅ Excel ссылка найдена в меню")
-                
+
                 # Используем JavaScript клик для надежности
                 self.driver.execute_script("arguments[0].click();", excel_node)
                 self.logger.info("✅ Excel экспорт запущен через клик по меню")
                 return True
-                
+
             except:
                 self.logger.error("❌ Excel ссылка не появилась в меню")
                 return False
-                
+
         except Exception as e:
             self.logger.warning(f"⚠️ Не удалось кликнуть Excel в меню: {e}")
             return False
