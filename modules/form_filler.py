@@ -242,10 +242,10 @@ class FormFiller:
                 # Ждем применения изменений
                 time.sleep(1)
 
-                # 3. Теперь выбираем нужный чекбокс по label (более надежно)
-                self.logger.info("🔍 Ищем чекбокс 'Низкая скорость в 3G/4G' по label...")
+                                # 3. Теперь выбираем нужный чекбокс (пробуем label, затем fallback)
+                self.logger.info("🔍 Ищем чекбокс 'Низкая скорость в 3G/4G'...")
 
-                # Пробуем найти по label тексту
+                # Пробуем найти по label тексту (тихо, без ошибок в логах)
                 checkbox = None
                 try:
                     # Ищем label с точным текстом (строго по названию)
@@ -271,24 +271,9 @@ class FormFiller:
                         checkbox = label.find_element("xpath", "./following-sibling::input[@type='checkbox']")
                         self.logger.info("✅ Чекбокс найден рядом с label")
 
-                except Exception as e:
-                    self.logger.warning(f"⚠️ Поиск по label не удался: {e}")
-
-                    # Диагностика: показываем все доступные label для отладки
-                    try:
-                        all_labels = self.driver.find_elements("xpath", "//label")
-                        internet_labels = []
-                        for lbl in all_labels:
-                            text = lbl.text.strip()
-                            if 'интернет' in text.lower() or 'скорость' in text.lower():
-                                internet_labels.append(text[:100])  # Первые 100 символов
-
-                        if internet_labels:
-                            self.logger.info(f"🔍 Найдены label с 'интернет' или 'скорость': {internet_labels[:3]}")
-                        else:
-                            self.logger.info("🔍 Label с 'интернет' или 'скорость' не найдены")
-                    except Exception as diag_e:
-                        self.logger.warning(f"⚠️ Диагностика не удалась: {diag_e}")
+                except Exception:
+                    # Тихий fallback без ошибок в логах
+                    pass
 
                     # Fallback: используем старый метод
                     checkbox_selector = self.form_elements.get_dropdown_selector('reason_checkbox')

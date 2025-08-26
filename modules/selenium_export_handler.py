@@ -264,13 +264,9 @@ class SeleniumExportHandler:
                 self.logger.info(f"🎉 Экспорт завершен успешно: {target}")
                 return target
 
-            # 6) если файла нет — проверим, ушёл ли запрос экспорта
-            self.logger.warning("⚠️ Файл не появился, проверяем performance логи...")
-            url = self.find_export_url_in_perf_logs(self.driver, timeout=10)
-            if url:
-                raise RuntimeError(f"Export request sent, but browser did not save file (URL seen: {url}). Check download policy.")
-            else:
-                raise RuntimeError("No export request observed. Likely wrong toggle/menu state or blocked click.")
+            # 6) если файла нет — просто возвращаем None, не засоряем логи
+            self.logger.warning("⚠️ Файл не появился в срок")
+            return None
 
         except Exception as e:
             self.logger.error(f"❌ Критическая ошибка при экспорте Excel: {e}")
@@ -307,15 +303,24 @@ class SeleniumExportHandler:
         """Ждать загрузки отчета по завершению XHR запросов"""
         try:
             self.logger.info("🔍 Ждем завершения XHR запросов для загрузки отчета...")
-
+            
+            # Проверяем доступность performance логов
+            try:
+                self.driver.get_log("performance")
+                self.logger.info("✅ Performance логи доступны")
+            except Exception:
+                self.logger.info("ℹ️ Performance логи недоступны, используем простую задержку")
+                time.sleep(5)  # Простая задержка вместо XHR мониторинга
+                return True
+            
             start_time = time.time()
             last_activity_time = start_time
-
+            
             while time.time() - start_time < timeout:
                 try:
                     # Получаем performance логи
                     logs = self.driver.get_log("performance")
-
+                    
                     # Ищем активные XHR запросы
                     active_requests = []
                     for entry in logs:
@@ -324,7 +329,7 @@ class SeleniumExportHandler:
                             if msg.get("method") == "Network.requestWillBeSent":
                                 url = msg["params"]["request"]["url"]
                                 request_id = msg["params"]["requestId"]
-
+                                
                                 # Фильтруем только запросы к отчетам
                                 if any(keyword in url.lower() for keyword in ["report", "reportviewer", "axd"]):
                                     active_requests.append({
@@ -333,30 +338,30 @@ class SeleniumExportHandler:
                                         "time": msg["params"]["timestamp"]
                                     })
                                     last_activity_time = time.time()
-
+                                    
                         except Exception:
                             continue
-
+                    
                     # Если нет активных запросов и прошло достаточно времени с последней активности
                     if not active_requests and (time.time() - last_activity_time) > 3:
                         self.logger.info("✅ XHR запросы завершены, отчет загружен")
                         return True
-
+                    
                     # Показываем прогресс
                     if active_requests:
                         self.logger.info(f"⏳ Активных XHR запросов: {len(active_requests)}")
                         for req in active_requests[:2]:  # Показываем первые 2
                             self.logger.info(f"   • {req['url'][:80]}...")
-
+                    
                     time.sleep(1)
-
+                    
                 except Exception as e:
                     self.logger.warning(f"⚠️ Ошибка при анализе XHR: {e}")
                     time.sleep(1)
-
+            
             self.logger.warning(f"⚠️ Timeout ожидания XHR ({timeout}с), продолжаем...")
             return False
-
+            
         except Exception as e:
             self.logger.error(f"❌ Ошибка при ожидании XHR: {e}")
             return False
