@@ -14,10 +14,11 @@ import os
 class ExcelExporter:
     """Класс для экспорта отчета в Excel"""
 
-    def __init__(self, driver, logger):
+    def __init__(self, driver, logger, download_dir=None):
         self.driver = driver
         self.logger = logger
-
+        self.download_dir = download_dir or os.path.expanduser("~/Downloads")
+        
         # Отключаем Google логи в консоли
         self._disable_google_logs()
 
@@ -225,60 +226,54 @@ class ExcelExporter:
             return False
 
     def export_to_excel(self, wait_time=120):
-        """Экспортировать отчет в Excel (исправленная версия)"""
+        """Экспортировать отчет в Excel (исправленная версия, с ожиданием файла)"""
         try:
             self.logger.info("📤 Начинаем экспорт отчета в Excel...")
 
-            # Ждем готовности отчета
             if not self.wait_for_report_ready(timeout=wait_time):
                 return False
 
-            # 1. Проверяем iframe и переключаемся в нужный контекст
             self.logger.info("🔍 Проверяем iframe и контекст страницы...")
-            iframe_found = self.check_and_switch_iframe()
+            self.check_and_switch_iframe()  # bool не нужен — либо нашли, либо работаем в default
 
-            # 2. ПРИОРИТЕТ: Пробуем прямой вызов ReportViewer API (самый надежный способ)
+            # Настроим директорию скачивания и очистим «хвосты»
+            download_dir = self.download_dir
+            self._cleanup_old_downloads(download_dir, patterns=(".xlsx", ".crdownload"))
+
+            # 1-й приоритет: прямой вызов API
             self.logger.info("🚀 Пробуем прямой экспорт через ReportViewer API...")
-            if self.export_via_reportviewer("EXCELOPENXML"):
-                self.logger.info("✅ Экспорт в Excel запущен через ReportViewer API")
-                return True
+            started = self.export_via_reportviewer("EXCELOPENXML")
+            if not started:
+                # 2-й приоритет: клик по меню
+                self.logger.info("🔄 Пробуем клик по меню Excel...")
+                started = self.click_excel_menu_item()
 
-            # 3. Альтернатива: клик по меню Excel
-            self.logger.info("🔄 Пробуем клик по меню Excel...")
-            if self.click_excel_menu_item():
-                self.logger.info("✅ Экспорт в Excel запущен через меню")
-                return True
-
-            # 4. Fallback: старый метод через поиск кнопки
-            self.logger.info("🔄 Используем fallback метод...")
-            export_button = self.find_export_button_by_text()
-            if not export_button:
-                self.logger.error("❌ Кнопка экспорта не найдена всеми методами")
-                return False
-
-            # Кликаем по кнопке экспорта
-            self.logger.info("💾 Нажимаем кнопку экспорта...")
-            try:
-                export_button.click()
-            except Exception as click_error:
-                self.logger.warning(f"⚠️ Обычный клик не сработал: {click_error}")
-                # Пробуем JavaScript клик
-                try:
-                    self.driver.execute_script("arguments[0].click();", export_button)
-                    self.logger.info("✅ Клик выполнен через JavaScript")
-                except Exception as js_click_error:
-                    self.logger.error(f"❌ JavaScript клик тоже не сработал: {js_click_error}")
+            if not started:
+                # 3-й приоритет: fallback-кнопка
+                self.logger.info("🔄 Используем fallback метод...")
+                export_button = self.find_export_button_by_text()
+                if not export_button:
+                    self.logger.error("❌ Кнопка экспорта не найдена всеми методами")
                     return False
+                try:
+                    export_button.click()
+                except Exception:
+                    self.driver.execute_script("arguments[0].click();", export_button)
+                time.sleep(2)
+                self.select_excel_format()  # best-effort
 
-            # Ждем появления выпадающего меню (если нужно)
-            time.sleep(2)
+            # === КРИТИЧЕСКОЕ: ждём файл ===
+            xlsx_path = self.wait_for_download(
+                download_dir=download_dir,
+                pattern=r".*\.xlsx$",
+                timeout=wait_time
+            )
+            if xlsx_path:
+                self.logger.info(f"✅ Экспорт в Excel завершен: {xlsx_path}")
+                return True
 
-            # Проверяем, нужно ли выбирать формат Excel из меню
-            if not self.select_excel_format():
-                self.logger.warning("⚠️ Не удалось выбрать формат Excel из меню, возможно экспорт уже запущен")
-
-            self.logger.info("✅ Экспорт в Excel завершен успешно")
-            return True
+            self.logger.error("❌ Файл .xlsx не появился в срок")
+            return False
 
         except Exception as e:
             self.logger.error(f"❌ Ошибка при экспорте в Excel: {e}")
@@ -446,97 +441,138 @@ class ExcelExporter:
             self.logger.error(f"❌ Ошибка при поиске через JavaScript: {e}")
             return None
 
-    def export_via_reportviewer(self, format_code: str = "EXCELOPENXML", timeout: int = 120) -> bool:
-        """
-        Самый надежный способ: вызвать JS: $find('ReportViewerControl').exportReport('<FORMAT>')
-        """
+    def _cleanup_old_downloads(self, download_dir, patterns=(".xlsx", ".crdownload")):
+        """Удалить старые файлы загрузок перед запуском"""
+        try:
+            import glob
+            import os
+            
+            for pattern in patterns:
+                files = glob.glob(os.path.join(download_dir, f"*{pattern}"))
+                for file_path in files:
+                    try:
+                        os.remove(file_path)
+                        self.logger.info(f"🗑️ Удален старый файл: {os.path.basename(file_path)}")
+                    except Exception as e:
+                        self.logger.warning(f"⚠️ Не удалось удалить {file_path}: {e}")
+                        
+        except Exception as e:
+            self.logger.warning(f"⚠️ Ошибка при очистке старых загрузок: {e}")
+
+    def wait_for_download(self, download_dir, pattern=r".*\.xlsx$", timeout=120):
+        """Ждать завершенного файла (без .crdownload)"""
+        try:
+            import glob
+            import os
+            import re
+            
+            self.logger.info(f"⏳ Ждем появления файла по паттерну: {pattern}")
+            
+            start_time = time.time()
+            while time.time() - start_time < timeout:
+                # Ищем файлы по паттерну
+                files = glob.glob(os.path.join(download_dir, "*"))
+                matching_files = [f for f in files if re.match(pattern, os.path.basename(f))]
+                
+                # Исключаем .crdownload файлы
+                completed_files = [f for f in matching_files if not f.endswith('.crdownload')]
+                
+                if completed_files:
+                    # Берем самый новый файл
+                    newest_file = max(completed_files, key=os.path.getctime)
+                    self.logger.info(f"✅ Файл найден: {os.path.basename(newest_file)}")
+                    return newest_file
+                
+                # Проверяем .crdownload файлы для прогресса
+                crdownload_files = [f for f in matching_files if f.endswith('.crdownload')]
+                if crdownload_files:
+                    newest_crdownload = max(crdownload_files, key=os.path.getctime)
+                    size = os.path.getsize(newest_crdownload)
+                    self.logger.info(f"📥 Загрузка в процессе: {os.path.basename(newest_crdownload)} ({size} байт)")
+                
+                time.sleep(1)
+            
+            self.logger.error(f"❌ Файл не появился за {timeout} секунд")
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при ожидании загрузки: {e}")
+            return None
+
+    def export_via_reportviewer(self, format_code: str = "EXCELOPENXML") -> bool:
+        """Вызов $find('ReportViewerControl').exportReport(format_code) с ожиданием готовности."""
         try:
             self.logger.info(f"🚀 Прямой экспорт через ReportViewer API: {format_code}")
-
+            
             # Обязательно проверяем iframe до JS
             self.check_and_switch_iframe()
-
-            # Ждём, пока загрузятся Sys.Application и сам ReportViewer
-            self.logger.info("⏳ Ждем загрузки Sys.Application...")
-            try:
-                WebDriverWait(self.driver, 30).until(
-                    lambda d: d.execute_script("return !!(window.Sys && Sys.Application);")
-                )
-                self.logger.info("✅ Sys.Application загружен")
-            except:
-                self.logger.warning("⚠️ Sys.Application не загрузился, пробуем продолжить...")
-
-            self.logger.info("⏳ Ждем загрузки ReportViewerControl...")
-            try:
-                WebDriverWait(self.driver, 30).until(
-                    lambda d: d.execute_script("return !!(window.$find && $find('ReportViewerControl'));")
-                )
-                self.logger.info("✅ ReportViewerControl загружен")
-            except:
-                self.logger.error("❌ ReportViewerControl не найден")
-                return False
-
+            
+            # Ждём готовности API
+            wait = WebDriverWait(self.driver, 30)
+            wait.until(lambda d: d.execute_script("return !!(window.Sys && Sys.Application);"))
+            wait.until(lambda d: d.execute_script("return !!(window.$find && $find('ReportViewerControl'));"))
+            
             # Запускаем экспорт
             self.logger.info(f"💾 Запускаем экспорт в формате {format_code}...")
             self.driver.execute_script(
                 "$find('ReportViewerControl').exportReport(arguments[0]);",
                 format_code
             )
-
+            
             self.logger.info("✅ Экспорт запущен через ReportViewer API")
             return True
-
+            
         except Exception as e:
-            self.logger.error(f"❌ Ошибка при экспорте через ReportViewer API: {e}")
+            self.logger.warning(f"⚠️ ReportViewer API недоступен: {e}")
             return False
 
     def click_excel_menu_item(self) -> bool:
-        """Клик по пункту меню Excel (альтернативный способ)"""
+        """Клик по пункту меню Excel (безопасный способ)"""
         try:
             self.logger.info("🖱️ Пытаемся кликнуть по пункту меню Excel...")
-
+            
             self.check_and_switch_iframe()
-
-            # Раскрываем меню экспорта (нужен реальный локатор кнопки/иконки «Export» в тулбаре)
-            try:
-                export_toggle = WebDriverWait(self.driver, 10).until(
-                    EC.element_to_be_clickable((
-                        By.XPATH,
-                        "//*[contains(@title,'Export') or contains(@aria-label,'Export') or .='Export']"
-                    ))
-                )
-                export_toggle.click()
+            
+            # Раскрыть экспорт-меню
+            toolbar = self.driver.find_element(By.ID, "ReportViewerControl")
+            toggle = None
+            cands = toolbar.find_elements(
+                By.XPATH, ".//*[contains(@title,'Export') or contains(@aria-label,'Export') or normalize-space(.)='Export']"
+            )
+            if cands:
+                toggle = cands[0]
+                self.driver.execute_script("arguments[0].click();", toggle)
+                time.sleep(0.3)
                 self.logger.info("✅ Меню экспорта раскрыто")
-            except:
+            else:
                 self.logger.warning("⚠️ Не удалось найти кнопку раскрытия меню экспорта")
                 return False
-
-            # Ждём появления видимого пункта Excel
-            def _find_excel_link(drv):
-                links = drv.find_elements(By.CSS_SELECTOR, "a.ActiveLink")
-                for el in links:
-                    try:
-                        if "Excel" in (el.text or el.get_attribute("textContent") or "") and el.is_enabled():
-                            return el
-                    except Exception:
-                        continue
+            
+            # Найти пункт Excel среди ActiveLink
+            def _find_excel(drv):
+                nodes = drv.find_elements(By.CSS_SELECTOR, "a.ActiveLink")
+                for n in nodes:
+                    txt = (n.text or n.get_attribute("textContent") or "").strip()
+                    if "Excel" in txt and n.is_enabled():
+                        # меню может быть абсолютным positioned; кликаем через JS
+                        return n
                 return False
-
+            
             try:
-                excel_link = WebDriverWait(self.driver, 10).until(_find_excel_link)
+                excel_node = WebDriverWait(self.driver, 10).until(_find_excel)
                 self.logger.info("✅ Excel ссылка найдена в меню")
-
+                
                 # Используем JavaScript клик для надежности
-                self.driver.execute_script("arguments[0].click();", excel_link)
+                self.driver.execute_script("arguments[0].click();", excel_node)
                 self.logger.info("✅ Excel экспорт запущен через клик по меню")
                 return True
-
+                
             except:
                 self.logger.error("❌ Excel ссылка не появилась в меню")
                 return False
-
+                
         except Exception as e:
-            self.logger.error(f"❌ Ошибка при клике по меню Excel: {e}")
+            self.logger.warning(f"⚠️ Не удалось кликнуть Excel в меню: {e}")
             return False
 
     def check_and_switch_iframe(self):
@@ -579,7 +615,9 @@ class ExcelExporter:
                     if (iframe_info.get('hasExportElements') or
                         iframe_info.get('hasActiveLinks') or
                         iframe_info.get('hasExcelText')):
-                        self.logger.info(f"✅ Найден нужный iframe {i+1}, остаемся здесь")
+                        self.logger.info(f"✅ Найден нужный iframe {i+1} (индекс: {i}), остаемся здесь")
+                        self.logger.info(f"   • Title: {iframe_info.get('title', 'Нет')}")
+                        self.logger.info(f"   • URL: {iframe_info.get('url', 'Нет')}")
                         return True
 
                     # Возвращаемся в основной контекст
@@ -767,16 +805,22 @@ class ExcelExporter:
             # Выполняем тот же JavaScript код, что и в вашем тесте
             js_test_code = """
             (function () {
-                // 1. Находим Excel кнопку среди ActiveLink
                 const activeLinks = Array.from(document.querySelectorAll('a.ActiveLink'));
                 const excelLink = activeLinks.find(el => (el.textContent || '').includes('Excel'));
+
+                const isElementVisible = (el) => {
+                    if (!el) return false;
+                    const style = window.getComputedStyle(el);
+                    if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+                    const rect = el.getBoundingClientRect();
+                    return rect.width > 0 && rect.height > 0;
+                };
 
                 const result = {
                     excelLinkFound: !!excelLink,
                     excelLinkInfo: null,
                     parentDropdown: null,
-                    isVisible: false,
-                    clickResult: null,
+                    isVisible: isElementVisible(excelLink),
                     exportElements: []
                 };
 
@@ -784,32 +828,23 @@ class ExcelExporter:
                     result.excelLinkInfo = {
                         text: excelLink.textContent,
                         className: excelLink.className,
-                        onclick: excelLink.onclick ? excelLink.onclick.toString() : null,
-                        style: excelLink.style.cssText
+                        onclick: excelLink.getAttribute('onclick'), // не toString(), именно атрибут
+                        style: excelLink.getAttribute('style')
                     };
-
-                    // Проверяем родительский dropdown
                     result.parentDropdown = excelLink.closest('[class*="Menu"], [class*="dropdown"], [class*="MenuBar"]');
-
-                    // Проверяем видимость
-                    result.isVisible = excelLink.offsetParent !== null &&
-                                     excelLink.style.display !== 'none' &&
-                                     excelLink.style.visibility !== 'hidden';
                 }
 
-                // Ищем все элементы с exportReport
-                const exportElements = Array.from(document.querySelectorAll('*')).filter(el => {
-                    const onclick = el.onclick ? el.onclick.toString() : '';
-                    return onclick.includes('exportReport');
-                });
-
-                result.exportElements = exportElements.map((el, i) => ({
-                    index: i + 1,
-                    tag: el.tagName,
-                    text: (el.textContent || '').trim(),
-                    onclick: el.onclick.toString()
-                }));
-
+                const all = Array.from(document.querySelectorAll('*'));
+                for (const el of all) {
+                    const ocAttr = el.getAttribute('onclick') || '';
+                    if (ocAttr.includes('exportReport')) {
+                        result.exportElements.push({
+                            tag: el.tagName,
+                            text: (el.textContent || '').trim().slice(0, 200),
+                            onclick: ocAttr
+                        });
+                    }
+                }
                 return result;
             })();
             """
