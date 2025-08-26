@@ -6,7 +6,7 @@ python new_site_report.py — Основной скрипт для выгруз�
 
 import sys
 import argparse
-import logging
+from loguru import logger
 import time
 from datetime import datetime, timedelta
 from pathlib import Path

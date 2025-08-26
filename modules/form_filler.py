@@ -3,7 +3,7 @@
 """
 
 from selenium.webdriver.support.ui import Select
-import logging
+from loguru import logger
 import time
 
 

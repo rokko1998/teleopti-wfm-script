@@ -6,8 +6,9 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import JavascriptException, WebDriverException
-import logging
+from loguru import logger
 import time
+import os
 
 
 class ExcelExporter:
@@ -17,48 +18,79 @@ class ExcelExporter:
         self.driver = driver
         self.logger = logger
 
+        # Отключаем Google логи в консоли
+        self._disable_google_logs()
+
+    def _disable_google_logs(self):
+        """Отключить Google логи в консоли"""
+        try:
+            # Устанавливаем переменные окружения для отключения логов
+            os.environ['WDM_LOG_LEVEL'] = '0'
+            os.environ['WDM_PRINT_FIRST_LINE'] = 'False'
+
+            # Выполняем JavaScript для отключения console.log от Google
+            js_code = """
+            // Отключаем Google логи
+            if (typeof console !== 'undefined') {
+                const originalLog = console.log;
+                const originalWarn = console.warn;
+                const originalError = console.error;
+
+                console.log = function(...args) {
+                    const message = args.join(' ');
+                    if (!message.includes('google_apis') &&
+                        !message.includes('voice_transcription') &&
+                        !message.includes('AiaRequest') &&
+                        !message.includes('Registration response error') &&
+                        !message.includes('WARNING: All log messages')) {
+                        originalLog.apply(console, args);
+                    }
+                };
+
+                console.warn = function(...args) {
+                    const message = args.join(' ');
+                    if (!message.includes('google_apis') &&
+                        !message.includes('voice_transcription') &&
+                        !message.includes('AiaRequest') &&
+                        !message.includes('Registration response error')) {
+                        originalWarn.apply(console, args);
+                    }
+                };
+
+                console.error = function(...args) {
+                    const message = args.join(' ');
+                    if (!message.includes('google_apis') &&
+                        !message.includes('voice_transcription') &&
+                        !message.includes('AiaRequest') &&
+                        !message.includes('Registration response error')) {
+                        originalError.apply(console, args);
+                    }
+                };
+            }
+            """
+            self.driver.execute_script(js_code)
+            self.logger.info("🔇 Google логи отключены")
+        except Exception as e:
+            self.logger.warning(f"⚠️ Не удалось отключить Google логи: {e}")
+
     def wait_for_report_ready(self, timeout=120):
         """Дождаться готовности отчета через проверку по промежуткам"""
         try:
             self.logger.info("⏳ Ждем готовности отчета...")
 
+            # Сначала ждем полной загрузки страницы
+            self.logger.info("⏳ Ждем полной загрузки страницы...")
+            try:
+                WebDriverWait(self.driver, 30).until(
+                    lambda driver: driver.execute_script("return document.readyState") == "complete"
+                )
+                self.logger.info("✅ Страница полностью загружена")
+            except:
+                self.logger.warning("⚠️ Страница не загрузилась полностью, продолжаем...")
+
             # Проверяем каждые 5 секунд в течение timeout
             check_interval = 5
             max_checks = timeout // check_interval
-
-            # Ищем кнопку экспорта по различным селекторам
-            export_selectors = [
-                # Основные селекторы по onclick
-                "a[onclick*='exportReport']",
-                "a[onclick*='EXCELOPENXML']",
-                "a[onclick*='Excel']",
-
-                # Селекторы по ID
-                "a[id*='Export']",
-                "a[id*='ctl04'][id*='ctl00']",
-                "a[id*='ctl04'][id*='ctl100']",
-
-                # Селекторы по классам
-                "a[class*='ActiveLink']",
-                "a[class*='Export']",
-                "a[class*='Button']",
-
-                # Селекторы по title и alt
-                "a[title*='Экспорт']",
-                "a[title*='Export']",
-                "a[alt*='Excel']",
-                "a[alt*='Экспорт']",
-
-                # Селекторы по структуре
-                "div[id*='Export'] a",
-                "div[class*='ToolbarExport'] a",
-                "div[class*='WidgetSet'] a",
-                "table[id*='Button'] a",
-
-                # Селекторы по содержимому
-                "a:contains('Excel')",
-                "a:contains('Экспорт')"
-            ]
 
             for check_num in range(max_checks):
                 self.logger.info(f"🔍 Проверка {check_num + 1}/{max_checks} - ищем кнопку экспорта...")
@@ -71,10 +103,18 @@ class ExcelExporter:
                     return True
 
                 # Если не найдено по тексту, пробуем CSS селекторы
+                export_selectors = [
+                    "a[onclick*='exportReport']",
+                    "a[onclick*='EXCELOPENXML']",
+                    "a[class*='ActiveLink']",
+                    "div[id*='Export'] a",
+                    "div[class*='ToolbarExport'] a"
+                ]
+
                 for selector in export_selectors:
                     try:
                         export_button = self.driver.find_element(By.CSS_SELECTOR, selector)
-                        if export_button.is_displayed() and export_button.is_enabled():
+                        if export_button.is_enabled():  # Убрали проверку is_displayed()
                             self.logger.info(f"✅ Кнопка экспорта найдена: {selector}")
                             self.logger.info("✅ Отчет готов к экспорту")
                             return True
@@ -207,11 +247,15 @@ class ExcelExporter:
             if not self.wait_for_report_ready(timeout=wait_time):
                 return False
 
-            # 1. Сначала показываем диагностику элементов экспорта
+                        # 1. Проверяем iframe и переключаемся в нужный контекст
+            self.logger.info("🔍 Проверяем iframe и контекст страницы...")
+            iframe_found = self.check_and_switch_iframe()
+            
+            # 2. Показываем диагностику элементов экспорта
             self.logger.info("🔍 Анализируем доступные элементы экспорта...")
             export_elements = self.find_export_elements_via_js()
-
-            # 2. Пробуем прямой клик через JavaScript (как в вашем тесте)
+            
+            # 3. Пробуем прямой клик через JavaScript (как в вашем тесте)
             self.logger.info("🚀 Пробуем прямой экспорт через JavaScript...")
             if self.click_excel_export_via_js():
                 self.logger.info("✅ Экспорт в Excel запущен через JavaScript")
@@ -255,45 +299,98 @@ class ExcelExporter:
             return False
 
     def find_excel_export_via_js(self):
-        """Найти Excel кнопку через JavaScript (как в тестовом скрипте)"""
+        """Найти Excel кнопку через JavaScript (улучшенная версия с диагностикой)"""
         try:
             self.logger.info("🔍 Ищем Excel кнопку через JavaScript...")
 
-            # JavaScript код для поиска Excel кнопки (основан на вашем тесте)
-            js_code = """
-            // 1. Находим Excel кнопку
-            const excelLink = document.querySelector('a.ActiveLink[text="Excel"]') ||
-                              Array.from(document.querySelectorAll('a.ActiveLink')).find(el => el.textContent.includes('Excel'));
-
-            if (excelLink) {
+            # Сначала проверим, в каком контексте мы находимся
+            context_info = self.driver.execute_script("""
                 return {
-                    found: true,
-                    element: excelLink,
-                    text: excelLink.textContent,
-                    className: excelLink.className,
-                    onclick: excelLink.onclick ? excelLink.onclick.toString() : null,
-                    isVisible: excelLink.offsetParent !== null &&
-                              excelLink.style.display !== 'none' &&
-                              excelLink.style.visibility !== 'hidden'
+                    url: window.location.href,
+                    title: document.title,
+                    readyState: document.readyState,
+                    iframeCount: document.querySelectorAll('iframe').length,
+                    activeElement: document.activeElement ? document.activeElement.tagName : 'none'
                 };
+            """)
+
+            self.logger.info(f"📋 Контекст страницы:")
+            self.logger.info(f"   • URL: {context_info.get('url', 'Нет')}")
+            self.logger.info(f"   • Title: {context_info.get('title', 'Нет')}")
+            self.logger.info(f"   • Ready State: {context_info.get('readyState', 'Нет')}")
+            self.logger.info(f"   • Iframe count: {context_info.get('iframeCount', 0)}")
+
+            # Улучшенный JavaScript код для поиска Excel кнопки
+            js_code = """
+            console.log('=== ДЕТАЛЬНЫЙ ПОИСК EXCEL КНОПКИ ===');
+
+            const results = {
+                found: false,
+                method: 'none',
+                details: {},
+                allLinks: [],
+                exportElements: []
+            };
+
+            // 1. Поиск по ActiveLink классу
+            console.log('1. Поиск по ActiveLink...');
+            const activeLinks = document.querySelectorAll('a.ActiveLink');
+            console.log('Найдено ActiveLink элементов:', activeLinks.length);
+
+            for (let i = 0; i < activeLinks.length; i++) {
+                const link = activeLinks[i];
+                const text = link.textContent.trim();
+                console.log(`ActiveLink ${i+1}: "${text}"`);
+
+                if (text.includes('Excel') || text.includes('excel')) {
+                    console.log('✅ Excel найден в ActiveLink!');
+                    results.found = true;
+                    results.method = 'ActiveLink';
+                    results.details = {
+                        element: link,
+                        text: text,
+                        className: link.className,
+                        onclick: link.onclick ? link.onclick.toString() : null,
+                        isVisible: link.offsetParent !== null &&
+                                  link.style.display !== 'none' &&
+                                  link.style.visibility !== 'hidden'
+                    };
+                    break;
+                }
             }
 
-            // 2. Альтернативный поиск по exportReport функциям
-            const exportElements = Array.from(document.querySelectorAll('*')).filter(el => {
-                const onclick = el.onclick ? el.onclick.toString() : '';
-                return onclick.includes('exportReport') && onclick.includes('EXCELOPENXML');
-            });
+            // 2. Поиск по exportReport функциям
+            if (!results.found) {
+                console.log('2. Поиск по exportReport...');
+                const allElements = document.querySelectorAll('*');
+                console.log('Всего элементов на странице:', allElements.length);
 
-            if (exportElements.length > 0) {
-                const excelElement = exportElements.find(el =>
-                    el.textContent.includes('Excel') || el.textContent.includes('excel')
-                );
+                const exportElements = Array.from(allElements).filter(el => {
+                    const onclick = el.onclick ? el.onclick.toString() : '';
+                    return onclick.includes('exportReport');
+                });
+
+                console.log('Элементы с exportReport:', exportElements.length);
+                results.exportElements = exportElements.map((el, i) => ({
+                    index: i + 1,
+                    tag: el.tagName,
+                    text: el.textContent.trim(),
+                    onclick: el.onclick.toString(),
+                    className: el.className
+                }));
+
+                const excelElement = exportElements.find(el => {
+                    const text = el.textContent.toLowerCase();
+                    return text.includes('excel') || text.includes('экспорт');
+                });
 
                 if (excelElement) {
-                    return {
-                        found: true,
+                    console.log('✅ Excel найден по exportReport!');
+                    results.found = true;
+                    results.method = 'exportReport';
+                    results.details = {
                         element: excelElement,
-                        text: excelElement.textContent,
+                        text: excelElement.textContent.trim(),
                         className: excelElement.className,
                         onclick: excelElement.onclick.toString(),
                         isVisible: excelElement.offsetParent !== null
@@ -301,21 +398,75 @@ class ExcelExporter:
                 }
             }
 
-            return { found: false };
+            // 3. Поиск по тексту во всех ссылках
+            if (!results.found) {
+                console.log('3. Поиск по тексту во всех ссылках...');
+                const allLinks = document.querySelectorAll('a');
+                console.log('Всего ссылок на странице:', allLinks.length);
+
+                results.allLinks = Array.from(allLinks).map((link, i) => ({
+                    index: i + 1,
+                    text: link.textContent.trim(),
+                    className: link.className,
+                    onclick: link.onclick ? link.onclick.toString() : null
+                }));
+
+                const excelLink = Array.from(allLinks).find(link => {
+                    const text = link.textContent.toLowerCase();
+                    return text.includes('excel') || text.includes('экспорт');
+                });
+
+                if (excelLink) {
+                    console.log('✅ Excel найден по тексту!');
+                    results.found = true;
+                    results.method = 'text_search';
+                    results.details = {
+                        element: excelLink,
+                        text: excelLink.textContent.trim(),
+                        className: excelLink.className,
+                        onclick: excelLink.onclick ? excelLink.onclick.toString() : null,
+                        isVisible: excelLink.offsetParent !== null
+                    };
+                }
+            }
+
+            console.log('Результат поиска:', results);
+            return results;
             """
 
             # Выполняем JavaScript
             result = self.driver.execute_script(js_code)
 
             if result and result.get('found'):
-                self.logger.info(f"✅ Excel кнопка найдена через JS: {result.get('text', 'Неизвестно')}")
-                self.logger.info(f"📊 Видимость: {result.get('isVisible', False)}")
-                self.logger.info(f"📋 OnClick: {result.get('onclick', 'Нет')}")
+                method = result.get('method', 'unknown')
+                details = result.get('details', {})
 
-                # Возвращаем WebElement (JavaScript вернул ссылку на элемент)
-                return result.get('element')
+                self.logger.info(f"✅ Excel кнопка найдена через JS (метод: {method}): {details.get('text', 'Неизвестно')}")
+                self.logger.info(f"📊 Видимость: {details.get('isVisible', False)}")
+                self.logger.info(f"📋 OnClick: {details.get('onclick', 'Нет')[:100] if details.get('onclick') else 'Нет'}...")
+
+                # Возвращаем WebElement
+                return details.get('element')
             else:
+                # Показываем детальную диагностику
                 self.logger.warning("⚠️ Excel кнопка не найдена через JavaScript")
+
+                if result:
+                    export_elements = result.get('exportElements', [])
+                    all_links = result.get('allLinks', [])
+
+                    if export_elements:
+                        self.logger.info(f"📋 Найдено {len(export_elements)} элементов с exportReport:")
+                        for elem in export_elements[:3]:  # Показываем первые 3
+                            self.logger.info(f"   • {elem['tag']}: '{elem['text'][:50]}...'")
+
+                    if all_links:
+                        excel_links = [link for link in all_links if 'excel' in link['text'].lower()]
+                        if excel_links:
+                            self.logger.info(f"🔍 Найдено {len(excel_links)} ссылок с 'Excel' в тексте:")
+                            for link in excel_links[:3]:
+                                self.logger.info(f"   • '{link['text']}' (класс: {link['className']})")
+
                 return None
 
         except JavascriptException as e:
@@ -324,6 +475,74 @@ class ExcelExporter:
         except Exception as e:
             self.logger.error(f"❌ Ошибка при поиске через JavaScript: {e}")
             return None
+
+    def check_and_switch_iframe(self):
+        """Проверить iframe и переключиться в нужный контекст"""
+        try:
+            self.logger.info("🔍 Проверяем iframe на странице...")
+            
+            # Ищем все iframe
+            iframes = self.driver.find_elements(By.TAG_NAME, "iframe")
+            self.logger.info(f"📋 Найдено {len(iframes)} iframe элементов")
+            
+            if not iframes:
+                self.logger.info("✅ Iframe не найдены, остаемся в основном контексте")
+                return True
+            
+            # Проверяем каждый iframe на наличие элементов экспорта
+            for i, iframe in enumerate(iframes):
+                try:
+                    self.logger.info(f"🔍 Проверяем iframe {i+1}...")
+                    
+                    # Переключаемся в iframe
+                    self.driver.switch_to.frame(iframe)
+                    
+                    # Проверяем содержимое iframe
+                    iframe_info = self.driver.execute_script("""
+                        return {
+                            title: document.title,
+                            url: window.location.href,
+                            hasExportElements: document.querySelectorAll('a[onclick*="exportReport"]').length > 0,
+                            hasActiveLinks: document.querySelectorAll('a.ActiveLink').length > 0,
+                            hasExcelText: document.querySelector('a:contains("Excel")') !== null
+                        };
+                    """)
+                    
+                    self.logger.info(f"   • Title: {iframe_info.get('title', 'Нет')}")
+                    self.logger.info(f"   • Has exportReport: {iframe_info.get('hasExportElements', False)}")
+                    self.logger.info(f"   • Has ActiveLink: {iframe_info.get('hasActiveLinks', False)}")
+                    
+                    # Если в этом iframe есть элементы экспорта, остаемся здесь
+                    if (iframe_info.get('hasExportElements') or 
+                        iframe_info.get('hasActiveLinks') or 
+                        iframe_info.get('hasExcelText')):
+                        self.logger.info(f"✅ Найден нужный iframe {i+1}, остаемся здесь")
+                        return True
+                    
+                    # Возвращаемся в основной контекст
+                    self.driver.switch_to.default_content()
+                    
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Ошибка при проверке iframe {i+1}: {e}")
+                    # Возвращаемся в основной контекст
+                    try:
+                        self.driver.switch_to.default_content()
+                    except:
+                        pass
+            
+            # Если не нашли нужный iframe, возвращаемся в основной контекст
+            self.driver.switch_to.default_content()
+            self.logger.info("⚠️ Подходящий iframe не найден, используем основной контекст")
+            return False
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при проверке iframe: {e}")
+            # Пытаемся вернуться в основной контекст
+            try:
+                self.driver.switch_to.default_content()
+            except:
+                pass
+            return False
 
     def find_export_elements_via_js(self):
         """Найти все элементы с exportReport через JavaScript"""
