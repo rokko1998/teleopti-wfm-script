@@ -303,24 +303,25 @@ class SeleniumExportHandler:
         """Ждать загрузки отчета по завершению XHR запросов"""
         try:
             self.logger.info("🔍 Ждем завершения XHR запросов для загрузки отчета...")
-            
+
             # Проверяем доступность performance логов
             try:
                 self.driver.get_log("performance")
                 self.logger.info("✅ Performance логи доступны")
             except Exception:
-                self.logger.info("ℹ️ Performance логи недоступны, используем простую задержку")
-                time.sleep(5)  # Простая задержка вместо XHR мониторинга
+                self.logger.info("ℹ️ Performance логи недоступны, используем расширенную задержку")
+                # Увеличиваем задержку для гарантии загрузки отчета
+                time.sleep(15)  # 15 секунд вместо 5
                 return True
-            
+
             start_time = time.time()
             last_activity_time = start_time
-            
+
             while time.time() - start_time < timeout:
                 try:
                     # Получаем performance логи
                     logs = self.driver.get_log("performance")
-                    
+
                     # Ищем активные XHR запросы
                     active_requests = []
                     for entry in logs:
@@ -329,7 +330,7 @@ class SeleniumExportHandler:
                             if msg.get("method") == "Network.requestWillBeSent":
                                 url = msg["params"]["request"]["url"]
                                 request_id = msg["params"]["requestId"]
-                                
+
                                 # Фильтруем только запросы к отчетам
                                 if any(keyword in url.lower() for keyword in ["report", "reportviewer", "axd"]):
                                     active_requests.append({
@@ -338,30 +339,30 @@ class SeleniumExportHandler:
                                         "time": msg["params"]["timestamp"]
                                     })
                                     last_activity_time = time.time()
-                                    
+
                         except Exception:
                             continue
-                    
+
                     # Если нет активных запросов и прошло достаточно времени с последней активности
                     if not active_requests and (time.time() - last_activity_time) > 3:
                         self.logger.info("✅ XHR запросы завершены, отчет загружен")
                         return True
-                    
+
                     # Показываем прогресс
                     if active_requests:
                         self.logger.info(f"⏳ Активных XHR запросов: {len(active_requests)}")
                         for req in active_requests[:2]:  # Показываем первые 2
                             self.logger.info(f"   • {req['url'][:80]}...")
-                    
+
                     time.sleep(1)
-                    
+
                 except Exception as e:
                     self.logger.warning(f"⚠️ Ошибка при анализе XHR: {e}")
                     time.sleep(1)
-            
+
             self.logger.warning(f"⚠️ Timeout ожидания XHR ({timeout}с), продолжаем...")
             return False
-            
+
         except Exception as e:
             self.logger.error(f"❌ Ошибка при ожидании XHR: {e}")
             return False

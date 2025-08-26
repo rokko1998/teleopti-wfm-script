@@ -248,28 +248,32 @@ class FormFiller:
                 # Пробуем найти по label тексту (тихо, без ошибок в логах)
                 checkbox = None
                 try:
-                    # Ищем label с точным текстом (строго по названию)
+                    # Ищем label с ТОЧНЫМ текстом (строго по названию)
                     label_xpath = """//label[
-                        contains(text(), 'Интернет >> Низкая скорость в 3G/4G') or
-                        contains(., 'Интернет >> Низкая скорость в 3G/4G') or
-                        contains(text(), 'Интернет&nbsp;&gt;&gt;&nbsp;Низкая&nbsp;скорость&nbsp;в&nbsp;3G/4G') or
-                        contains(., 'Интернет&nbsp;&gt;&gt;&nbsp;Низкая&nbsp;скорость&nbsp;в&nbsp;3G/4G')
+                        normalize-space(text()) = 'Интернет >> Низкая скорость в 3G/4G' or
+                        normalize-space(.) = 'Интернет >> Низкая скорость в 3G/4G' or
+                        normalize-space(text()) = 'Интернет&nbsp;&gt;&gt;&nbsp;Низкая&nbsp;скорость&nbsp;в&nbsp;3G/4G' or
+                        normalize-space(.) = 'Интернет&nbsp;&gt;&gt;&nbsp;Низкая&nbsp;скорость&nbsp;в&nbsp;3G/4G'
                     ]"""
                     label = self.driver.find_element("xpath", label_xpath)
 
-                    # Проверяем что нашли именно нужный label
+                    # Дополнительная проверка - убеждаемся что это именно нужный label
                     label_text = label.text.strip()
-                    self.logger.info(f"✅ Найден label: '{label_text}'")
-
-                    # Получаем for атрибут и ищем соответствующий input
-                    for_attr = label.get_attribute("for")
-                    if for_attr:
-                        checkbox = self.driver.find_element("id", for_attr)
-                        self.logger.info(f"✅ Чекбокс найден по label с for='{for_attr}'")
+                    if "Интернет" in label_text and "Низкая скорость" in label_text and "3G/4G" in label_text:
+                        self.logger.info(f"✅ Найден правильный label: '{label_text}'")
+                        
+                        # Получаем for атрибут и ищем соответствующий input
+                        for_attr = label.get_attribute("for")
+                        if for_attr:
+                            checkbox = self.driver.find_element("id", for_attr)
+                            self.logger.info(f"✅ Чекбокс найден по label с for='{for_attr}'")
+                        else:
+                            # Если нет for, ищем input рядом с label
+                            checkbox = label.find_element("xpath", "./following-sibling::input[@type='checkbox']")
+                            self.logger.info("✅ Чекбокс найден рядом с label")
                     else:
-                        # Если нет for, ищем input рядом с label
-                        checkbox = label.find_element("xpath", "./following-sibling::input[@type='checkbox']")
-                        self.logger.info("✅ Чекбокс найден рядом с label")
+                        self.logger.warning(f"⚠️ Найден label не подходит: '{label_text}'")
+                        raise Exception("Label не содержит нужный текст")
 
                 except Exception:
                     # Тихий fallback без ошибок в логах

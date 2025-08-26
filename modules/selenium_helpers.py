@@ -153,6 +153,7 @@ def get_driver(headless: bool = True) -> webdriver.Chrome:
         # АГРЕССИВНО отключаем Google логи и другие шумные сообщения
         logger.info("🔇 Отключаем Google логи и шумные сообщения...")
         try:
+            # JavaScript фильтрация
             driver.execute_script("""
                 (function () {
                     const originalLog = console.log;
@@ -165,11 +166,16 @@ def get_driver(headless: bool = True) -> webdriver.Chrome:
                         msg.includes('AiaRequest') ||
                         msg.includes('Registration response error') ||
                         msg.includes('DEPRECATED_ENDPOINT') ||
+                        msg.includes('QUOTA_EXCEEDED') ||
                         msg.includes('cert_issuer_source_aia') ||
                         msg.includes('OnFetchCompleted got error') ||
                         msg.includes('WARNING: All log messages') ||
                         msg.includes('net\\cert') ||
-                        msg.includes('gcm\\engine');
+                        msg.includes('gcm\\engine') ||
+                        msg.includes('absl::InitializeLog') ||
+                        msg.includes('Registering VoiceTranscriptionCapability') ||
+                        msg.includes('voice_transcription.cc') ||
+                        msg.includes('registration_request.cc');
 
                     console.log = function (...args) {
                         const message = args.join(' ');
@@ -187,7 +193,34 @@ def get_driver(headless: bool = True) -> webdriver.Chrome:
                     };
                 })();
             """)
-            logger.info("✅ Google логи отключены")
+            
+            # Дополнительная Python фильтрация
+            import sys
+            import io
+            
+            class FilteredStderr:
+                def __init__(self, original_stderr):
+                    self.original_stderr = original_stderr
+                    self.buffer = ""
+                
+                def write(self, text):
+                    # Фильтруем Google логи
+                    if any(noise in text for noise in [
+                        'google_apis', 'voice_transcription', 'AiaRequest',
+                        'DEPRECATED_ENDPOINT', 'QUOTA_EXCEEDED', 'cert_issuer_source_aia',
+                        'absl::InitializeLog', 'Registering VoiceTranscriptionCapability',
+                        'voice_transcription.cc', 'registration_request.cc'
+                    ]):
+                        return
+                    self.original_stderr.write(text)
+                
+                def flush(self):
+                    self.original_stderr.flush()
+            
+            # Применяем фильтр к stderr
+            sys.stderr = FilteredStderr(sys.stderr)
+            
+            logger.info("✅ Google логи отключены (JavaScript + Python)")
         except Exception as e:
             logger.warning(f"⚠️ Не удалось отключить Google логи: {e}")
 
