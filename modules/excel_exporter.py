@@ -250,11 +250,11 @@ class ExcelExporter:
                         # 1. Проверяем iframe и переключаемся в нужный контекст
             self.logger.info("🔍 Проверяем iframe и контекст страницы...")
             iframe_found = self.check_and_switch_iframe()
-            
+
             # 2. Показываем диагностику элементов экспорта
             self.logger.info("🔍 Анализируем доступные элементы экспорта...")
             export_elements = self.find_export_elements_via_js()
-            
+
             # 3. Пробуем прямой клик через JavaScript (как в вашем тесте)
             self.logger.info("🚀 Пробуем прямой экспорт через JavaScript...")
             if self.click_excel_export_via_js():
@@ -480,23 +480,23 @@ class ExcelExporter:
         """Проверить iframe и переключиться в нужный контекст"""
         try:
             self.logger.info("🔍 Проверяем iframe на странице...")
-            
+
             # Ищем все iframe
             iframes = self.driver.find_elements(By.TAG_NAME, "iframe")
             self.logger.info(f"📋 Найдено {len(iframes)} iframe элементов")
-            
+
             if not iframes:
                 self.logger.info("✅ Iframe не найдены, остаемся в основном контексте")
                 return True
-            
+
             # Проверяем каждый iframe на наличие элементов экспорта
             for i, iframe in enumerate(iframes):
                 try:
                     self.logger.info(f"🔍 Проверяем iframe {i+1}...")
-                    
+
                     # Переключаемся в iframe
                     self.driver.switch_to.frame(iframe)
-                    
+
                     # Проверяем содержимое iframe
                     iframe_info = self.driver.execute_script("""
                         return {
@@ -507,21 +507,21 @@ class ExcelExporter:
                             hasExcelText: document.querySelector('a:contains("Excel")') !== null
                         };
                     """)
-                    
+
                     self.logger.info(f"   • Title: {iframe_info.get('title', 'Нет')}")
                     self.logger.info(f"   • Has exportReport: {iframe_info.get('hasExportElements', False)}")
                     self.logger.info(f"   • Has ActiveLink: {iframe_info.get('hasActiveLinks', False)}")
-                    
+
                     # Если в этом iframe есть элементы экспорта, остаемся здесь
-                    if (iframe_info.get('hasExportElements') or 
-                        iframe_info.get('hasActiveLinks') or 
+                    if (iframe_info.get('hasExportElements') or
+                        iframe_info.get('hasActiveLinks') or
                         iframe_info.get('hasExcelText')):
                         self.logger.info(f"✅ Найден нужный iframe {i+1}, остаемся здесь")
                         return True
-                    
+
                     # Возвращаемся в основной контекст
                     self.driver.switch_to.default_content()
-                    
+
                 except Exception as e:
                     self.logger.warning(f"⚠️ Ошибка при проверке iframe {i+1}: {e}")
                     # Возвращаемся в основной контекст
@@ -529,12 +529,12 @@ class ExcelExporter:
                         self.driver.switch_to.default_content()
                     except:
                         pass
-            
+
             # Если не нашли нужный iframe, возвращаемся в основной контекст
             self.driver.switch_to.default_content()
             self.logger.info("⚠️ Подходящий iframe не найден, используем основной контекст")
             return False
-            
+
         except Exception as e:
             self.logger.error(f"❌ Ошибка при проверке iframe: {e}")
             # Пытаемся вернуться в основной контекст

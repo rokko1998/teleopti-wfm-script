@@ -25,23 +25,6 @@ NEW_SITE_URL = (
 DEFAULT_DOWNLOAD_DIR = str(Path.home() / "Downloads")
 
 
-def setup_logging(level=logging.INFO):
-    """
-    Настраивает логирование.
-
-    Args:
-        level: Уровень логирования
-    """
-    logging.basicConfig(
-        level=level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.StreamHandler(),
-            logging.FileHandler('new_site_report.log', encoding='utf-8')
-        ]
-    )
-    return logging.getLogger(__name__)
-
 
 def parse_arguments():
     """
@@ -146,7 +129,6 @@ def main():
     args = parse_arguments()
 
     # Настраиваем логирование
-    logger = setup_logging()
     logger.info("🚀 Запуск скрипта для работы с новым сайтом отчетов")
 
     # Проверяем директорию для загрузки

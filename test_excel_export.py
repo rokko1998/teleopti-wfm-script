@@ -60,21 +60,21 @@ def test_excel_export_methods():
         logger.info("3. Убедиться, что отчет загружен")
 
                 # Когда будет реальная страница, раскомментируйте эти строки:
-        
+
         # logger.info("📊 Запуск диагностического теста...")
         # test_result = exporter.run_excel_export_test()
-        
+
         # logger.info("🔍 Поиск элементов через JavaScript...")
         # export_elements = exporter.find_export_elements_via_js()
-        
+
         # logger.info("🚀 Тестирование прямого экспорта...")
         # success = exporter.click_excel_export_via_js()
         # logger.info(f"Результат прямого экспорта: {'✅ Успех' if success else '❌ Неудача'}")
-        
+
         # logger.info("🔍 Проверка iframe...")
         # iframe_found = exporter.check_and_switch_iframe()
         # logger.info(f"Результат проверки iframe: {'✅ Найден' if iframe_found else '❌ Не найден'}")
-        
+
         logger.info("✅ Тестовый скрипт готов к использованию")
         logger.info("🚀 Новые возможности:")
         logger.info("   • Отключение Google логов")
