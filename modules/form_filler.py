@@ -5,6 +5,7 @@
 from selenium.webdriver.support.ui import Select
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from loguru import logger
 import time
@@ -13,19 +14,17 @@ import time
 class FormFiller:
     """Класс для заполнения формы отчета"""
 
-        # Устойчивые локаторы для ReportViewer dropdown
+            # Устойчивые локаторы для ReportViewer dropdown
     DROPDOWN_ROOT = (
-        "xpath",
-        "//div[starts-with(@id,'ReportViewerControl_') and contains(@id,'_divDropDown')]"
+        By.XPATH,
+        # единственная активная выпадайка ReportViewer
+        "//div[starts-with(@id,'ReportViewerControl_') and contains(@id,'_divDropDown') and contains(@style,'display: block')]"
     )
-
-    # NBSP -> пробел и поиск по частям текста
-    LABEL_XPATH = (
-        ".//label["
-        "contains(normalize-space(translate(., '\u00A0',' ')), 'Интернет') and "
-        "contains(normalize-space(translate(., '\u00A0',' ')), 'Низкая скорость') and "
-        "contains(normalize-space(translate(., '\u00A0',' ')), '3G/4G')"
-        "]"
+    
+    # NBSP -> пробел, затем нормализация пробелов
+    LABEL_REL_XPATH = (
+        ".//label[normalize-space(translate(., '\u00A0', ' '))="
+        " 'Интернет >> Низкая скорость в 3G/4G']"
     )
 
     def __init__(self, driver, logger, iframe_handler, form_elements):
@@ -298,89 +297,32 @@ class FormFiller:
                 time.sleep(2)
                 self.logger.info("✅ Готовы к выбору чекбокса")
 
-                                # 3. Ищем нужный label сразу в открытом dropdown (не переходя в корень)
-                self.logger.info("🔍 Ищем нужный label в открытом dropdown...")
+                                                # 3. ⚠️ ВАЖНЫЙ ПЕРЕХОД из iframe в корень, дальше ищем не в iframe
+                self.logger.info("🔄 Переходим в корень страницы для поиска label в dropdown...")
                 
-                try:
-                    # Ищем label с нужным текстом в текущем iframe
-                    label_xpath = """//label[
-                        contains(., 'Интернет') and 
-                        contains(., 'Низкая скорость') and 
-                        contains(., '3G/4G')
-                    ]"""
-                    
-                    self.logger.info(f"🔍 XPath для поиска: {label_xpath}")
-                    
-                    # Ищем label в текущем iframe
-                    label = self.iframe_handler.find_element_in_iframe(("xpath", label_xpath))
-                    if not label:
-                        raise Exception("Label не найден в текущем iframe")
-                    
-                    self.logger.info("✅ Label найден в текущем iframe")
-                    
-                    # Дополнительная проверка - убеждаемся что это именно нужный label
-                    label_text = label.text.strip()
-                    if "Интернет" in label_text and "Низкая скорость" in label_text and "3G/4G" in label_text:
-                        self.logger.info(f"✅ Найден правильный label: '{label_text}'")
-                        
-                        # Получаем for атрибут и ищем соответствующий input
-                        for_attr = label.get_attribute("for")
-                        if for_attr:
-                            checkbox = self.iframe_handler.find_element_in_iframe(("id", for_attr))
-                            if checkbox:
-                                self.logger.info(f"✅ Чекбокс найден по label с for='{for_attr}'")
-                            else:
-                                raise Exception("Чекбокс не найден по for атрибуту")
-                        else:
-                            # Если нет for, ищем input рядом с label
-                            checkbox = label.find_element("xpath", "./following-sibling::input[@type='checkbox']")
-                            self.logger.info("✅ Чекбокс найден рядом с label")
-                    else:
-                        self.logger.warning(f"⚠️ Найден label не подходит: '{label_text}'")
-                        raise Exception("Label не содержит нужный текст")
-                    
-                    # Проверяем, не выбран ли уже чекбокс
-                    if not checkbox.is_selected():
-                        self.logger.info("✅ Выбираем чекбокс 'Низкая скорость в 3G/4G'...")
-                        
-                        # Проверяем что нет блокирующих модальных окон
-                        try:
-                            blocking_modal = self.driver.find_element("xpath",
-                                "//div[contains(@class, 'modal') and contains(@class, 'in') and @style*='display: block']")
-                            if blocking_modal.is_displayed():
-                                self.logger.warning("⚠️ Обнаружено блокирующее модальное окно, ждем исчезновения...")
-                                time.sleep(3)  # Ждем исчезновения
-                        except:
-                            # Модальное окно не найдено - можно кликать
-                            pass
-                        
-                        # Пробуем клик с проверкой на блокировку
-                        try:
-                            checkbox.click()
-                            self.logger.info("✅ Чекбокс успешно выбран")
-                        except Exception as click_error:
-                            if "element click intercepted" in str(click_error):
-                                self.logger.warning("⚠️ Клик заблокирован, пробуем JavaScript клик...")
-                                try:
-                                    self.driver.execute_script("arguments[0].click();", checkbox)
-                                    self.logger.info("✅ Чекбокс выбран через JavaScript")
-                                except Exception as js_error:
-                                    self.logger.error(f"❌ JavaScript клик тоже не удался: {js_error}")
-                                    raise js_error
-                            else:
-                                raise click_error
-                    else:
-                        self.logger.info("✅ Чекбокс 'Низкая скорость в 3G/4G' уже выбран")
-                    
-                    # Ждем применения выбора
-                    time.sleep(1)
-                    
-                    self.logger.info("✅ Причина обращения установлена: Низкая скорость в 3G/4G")
-                    return True
-                    
-                except Exception as e:
-                    self.logger.error(f"❌ Не удалось найти или выбрать label: {e}")
+                # 1) выходим из iframe — дальше всё в корне
+                self.driver.switch_to.default_content()
+                
+                # 2) убеждаемся, что dropdown реально открыт (ReportViewer любит закрывать его)
+                self._ensure_dropdown_open("#ReportViewerControl_ctl04_ctl23_divDropDown_ctl00")
+                
+                # 3) ищем нужный <label> внутри контейнера dropdown
+                label = self._find_label_in_dropdown()
+                if not label:
+                    self.logger.error("❌ Не нашёл label 'Интернет >> Низкая скорость в 3G/4G' в dropdown")
                     return False
+                
+                # 4) клик по label надёжнее, чем по input (он связан через for)
+                try:
+                    wait = WebDriverWait(self.driver, 5)
+                    wait.until(EC.element_to_be_clickable(label)).click()
+                    self.logger.info("✅ Label успешно выбран")
+                except Exception:
+                    self.driver.execute_script("arguments[0].click();", label)
+                    self.logger.info("✅ Label выбран через JavaScript")
+                
+                self.logger.info("✅ Причина обращения установлена: Низкая скорость в 3G/4G")
+                return True
 
             finally:
                 # Возвращаемся в основной документ
@@ -552,58 +494,51 @@ class FormFiller:
             self.logger.error(f"❌ Ошибка при поиске на странице: {e}")
             return None
 
-    def _open_dropdown_again_if_closed(self, toggle_in_iframe_locator, timeout=10):
-        """Если корневого dropdown нет/невидим — снова кликаем toggle внутри iframe"""
+    def _ensure_dropdown_open(self, toggle_in_iframe_locator, timeout=10):
+        """Если контейнер не виден — снова щёлкнем по тогглу (внутри iframe)"""
         try:
-            root = self.driver.find_element(self.DROPDOWN_ROOT[0], self.DROPDOWN_ROOT[1])
+            root = self.driver.find_element(*self.DROPDOWN_ROOT)
             if not root.is_displayed():
-                self.logger.info("🔄 Dropdown невидим, переоткрываем...")
-                # Возвращаемся в iframe для клика
-                self.iframe_handler.switch_to_iframe()
-                toggle = self.iframe_handler.find_element_in_iframe(toggle_in_iframe_locator)
-                toggle.click()
-                # Возвращаемся в корень
-                self.driver.switch_to.default_content()
+                raise Exception("hidden")
         except:
-            self.logger.info("🔄 Dropdown не найден, открываем...")
-            # Возвращаемся в iframe для клика
+            # вернёмся в iframe только чтобы нажать тоггл
+            self.logger.info("🔄 Dropdown не найден или невидим, переоткрываем...")
             self.iframe_handler.switch_to_iframe()
             toggle = self.iframe_handler.find_element_in_iframe(toggle_in_iframe_locator)
             toggle.click()
-            # Возвращаемся в корень
             self.driver.switch_to.default_content()
-
+        
         # Ждем появления dropdown
         wait = WebDriverWait(self.driver, timeout)
-        root = wait.until(EC.visibility_of_element_located((self.DROPDOWN_ROOT[0], self.DROPDOWN_ROOT[1])))
+        root = wait.until(EC.visibility_of_element_located(self.DROPDOWN_ROOT))
         self.logger.info("✅ Dropdown открыт и видим")
 
     def _find_label_in_dropdown(self, timeout=10):
         """Найти label внутри контейнера dropdown"""
         try:
             wait = WebDriverWait(self.driver, timeout)
-            root = wait.until(EC.visibility_of_element_located((self.DROPDOWN_ROOT[0], self.DROPDOWN_ROOT[1])))
-
-            # У dropdown внутри есть прокручиваемая область <div style="overflow:auto">
+            root = wait.until(EC.visibility_of_element_located(self.DROPDOWN_ROOT))
+            
+            # часто внутри есть прокручиваемый div
             try:
-                scrollbox = root.find_element(By.XPATH, ".//div[descendant::table and contains(@style,'overflow')]")
+                scrollbox = root.find_element(By.XPATH, ".//div[contains(@style,'overflow') and descendant::table]")
                 self.logger.info("✅ Найдена прокручиваемая область dropdown")
             except:
                 scrollbox = root
                 self.logger.info("⚠️ Прокручиваемая область не найдена, используем весь dropdown")
-
-            # Пробуем найти сразу:
+            
+            # сначала пробуем найти без скролла (по точному тексту с NBSP-нормализацией)
             try:
-                label = scrollbox.find_element(By.XPATH, self.LABEL_XPATH)
+                label = scrollbox.find_element(By.XPATH, self.LABEL_REL_XPATH)
                 self.logger.info("✅ Label найден сразу")
                 return label
             except:
                 self.logger.info("🔍 Label не найден сразу, выполняем пошаговый скролл...")
-
-                # Если не видно, скроллим и ищем по шагам
+                
+                # скроллим шагами и ищем
                 total = self.driver.execute_script("return arguments[0].scrollHeight", scrollbox)
                 view = self.driver.execute_script("return arguments[0].clientHeight", scrollbox)
-                step = max(view // 2, 80)
+                step = max(view // 2, 100)
 
                 self.logger.info(f"📜 Высота: {total}, видимая: {view}, шаг: {step}")
 
