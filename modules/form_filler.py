@@ -280,19 +280,7 @@ class FormFiller:
                 time.sleep(2)
                 self.logger.info("✅ Готовы к выбору чекбокса")
 
-                # 3. ПОВТОРНО ОТКРЫВАЕМ выпадающий список (ReportViewer часто закрывает после "Выделить все")
-                self.logger.info("🔄 Повторно открываем выпадающий список...")
-                try:
-                    dropdown_toggle = self.iframe_handler.find_element_in_iframe("#ReportViewerControl_ctl04_ctl23_divDropDown_ctl00")
-                    dropdown_toggle.click()
-                    self.logger.info("✅ Выпадающий список повторно открыт")
-                    
-                    # Ждем появления панели с чекбоксами
-                    time.sleep(1)
-                except Exception as e:
-                    self.logger.warning(f"⚠️ Не удалось повторно открыть dropdown: {e}")
-
-                # 4. Теперь выбираем нужный чекбокс (пробуем label, затем fallback)
+                                # 3. Теперь выбираем нужный чекбокс (пробуем label, затем fallback)
                 self.logger.info("🔍 Ищем чекбокс 'Низкая скорость в 3G/4G'...")
 
                 # Пробуем найти по label тексту (тихо, без ошибок в логах)
@@ -310,14 +298,34 @@ class FormFiller:
 
                     self.logger.info(f"🔍 XPath для поиска: {label_xpath}")
 
-                    # Ищем во всех доступных iframe'ах
-                    label = self._find_label_in_all_iframes(label_xpath)
-                    if not label:
-                        # Если не найден в iframe'ах, ищем на всей странице
-                        self.logger.info("🔍 Label не найден в iframe'ах, ищем на всей странице...")
-                        label = self._find_label_on_page(label_xpath)
-                        if not label:
-                            raise Exception("Label не найден ни в iframe'ах, ни на странице")
+                    # Ищем label в том же блоке, где мы снимали галочку "Выделить все"
+                    self.logger.info("🔍 Ищем label в том же блоке dropdown...")
+                    try:
+                        # Ищем в текущем iframe (где мы уже находимся)
+                        label = self.iframe_handler.find_element_in_iframe(("xpath", label_xpath))
+                        if label:
+                            self.logger.info("✅ Label найден в текущем iframe")
+                        else:
+                            raise Exception("Label не найден в текущем iframe")
+                    except Exception as e:
+                        self.logger.warning(f"⚠️ Label не найден в текущем iframe: {e}")
+                        
+                        # Fallback: ищем по более простому XPath в том же блоке
+                        self.logger.info("🔄 Fallback: ищем по простому XPath в том же блоке...")
+                        try:
+                            fallback_xpath = """//label[
+                                contains(., 'Интернет') and 
+                                contains(., 'Низкая скорость') and 
+                                contains(., '3G/4G')
+                            ]"""
+                            label = self.iframe_handler.find_element_in_iframe(("xpath", fallback_xpath))
+                            if label:
+                                self.logger.info("✅ Label найден по fallback XPath")
+                            else:
+                                raise Exception("Label не найден даже по fallback XPath")
+                        except Exception as fallback_e:
+                            self.logger.error(f"❌ Label не найден ни одним способом: {fallback_e}")
+                            raise fallback_e
 
                     # Дополнительная проверка - убеждаемся что это именно нужный label
                     label_text = label.text.strip()
@@ -341,89 +349,7 @@ class FormFiller:
                         raise Exception("Label не содержит нужный текст")
 
                 except Exception as e:
-                    self.logger.warning(f"⚠️ Попытка 1 не удалась: {e}")
-
-                    # Диагностика: показываем все доступные label'ы в iframe
-                    try:
-                        self.logger.info("🔍 Диагностика: ищем все label'ы в iframe...")
-                        all_labels = self.iframe_handler.find_element_in_iframe(
-                            ("xpath", "//label")
-                        )
-                        if all_labels:
-                            # Получаем все label'ы
-                            labels = self.driver.find_elements("xpath", ".//label")
-                            label_texts = []
-                            for lbl in labels[:10]:  # Показываем первые 10
-                                try:
-                                    text = lbl.text.strip()
-                                    if text and len(text) > 10:  # Только непустые и длинные
-                                        label_texts.append(text)
-                                except:
-                                    pass
-
-                            if label_texts:
-                                self.logger.info(f"📋 Найденные label'ы в iframe: {label_texts}")
-                            else:
-                                self.logger.info("📋 Label'ы не найдены или пустые")
-                        else:
-                            self.logger.info("📋 Не удалось найти label'ы в iframe")
-                    except Exception as diag_e:
-                        self.logger.warning(f"⚠️ Диагностика не удалась: {diag_e}")
-
-                    self.logger.info("🔄 Переходим к fallback механизму...")
-
-                    # Fallback: ищем по более простому XPath (без жестких ID)
-                    self.logger.info("🔄 Fallback: ищем по XPath без жестких ID...")
-                    try:
-                        # Ищем любой чекбокс с label, содержащим нужный текст
-                        fallback_xpath = """//input[@type='checkbox'][
-                            following-sibling::label[
-                                contains(., 'Интернет') and 
-                                contains(., 'Низкая скорость') and 
-                                contains(., '3G/4G')
-                            ]
-                        ]"""
-                        checkbox = self.iframe_handler.find_element_in_iframe(("xpath", fallback_xpath))
-                        if checkbox:
-                            self.logger.info("✅ Fallback: найден чекбокс по XPath")
-                        else:
-                            self.logger.info("⚠️ Fallback XPath не нашел чекбокс")
-                    except Exception as e:
-                        self.logger.warning(f"⚠️ Fallback XPath не удался: {e}")
-                        checkbox = None
-                        if checkbox:
-                            # Проверяем что нашли правильный чекбокс
-                            try:
-                                # Ищем label для этого чекбокса
-                                checkbox_id = checkbox.get_attribute("id")
-                                if checkbox_id:
-                                    self.logger.info(f"🔍 Fallback: найден чекбокс с ID '{checkbox_id}', ищем label...")
-                                    label = self.iframe_handler.find_element_in_iframe(
-                                        ("xpath", f"//label[@for='{checkbox_id}']")
-                                    )
-                                    if label:
-                                        label_text = label.text.strip()
-                                        self.logger.info(f"✅ Fallback: найден чекбокс с label '{label_text}'")
-                                        if "Интернет" in label_text and "Низкая скорость" in label_text:
-                                            self.logger.info("✅ Это правильный чекбокс!")
-                                        else:
-                                            self.logger.warning(f"⚠️ Fallback нашел неправильный чекбокс: '{label_text}'")
-                                            self.logger.warning("⚠️ Ожидалось: 'Интернет >> Низкая скорость в 3G/4G'")
-                                            checkbox = None
-                                    else:
-                                        self.logger.info(f"✅ Fallback: найден чекбокс с ID '{checkbox_id}' (без label)")
-                                else:
-                                    self.logger.info("✅ Fallback: найден чекбокс без ID")
-                            except Exception as e:
-                                self.logger.warning(f"⚠️ Ошибка при проверке fallback чекбокса: {e}")
-                                checkbox = None
-                        else:
-                            self.logger.warning("⚠️ Fallback селектор не нашел чекбокс")
-                    else:
-                        self.logger.warning("⚠️ Fallback селектор не определен")
-
-                if not checkbox:
-                    self.logger.error("❌ Чекбокс 'Низкая скорость в 3G/4G' не найден ни одним способом")
+                    self.logger.error(f"❌ Не удалось найти label: {e}")
                     return False
 
                 # Проверяем, не выбран ли уже чекбокс
@@ -485,7 +411,7 @@ class FormFiller:
 
                         # Возвращаемся в основной документ для поиска всех iframe'ов
             self.iframe_handler.switch_to_main_document()
-            
+
             # СНАЧАЛА ищем в main document (панель могла уехать наверх)
             self.logger.info("🔍 Сначала ищем в main document...")
             try:
@@ -493,7 +419,7 @@ class FormFiller:
                 if label and label.is_displayed():
                     label_text = label.text.strip()
                     self.logger.info(f"✅ Label найден в main document: '{label_text}'")
-                    
+
                     # Проверяем что это нужный label
                     if ("Интернет" in label_text or "Интернет" in label.get_attribute("innerHTML", "")) and \
                        ("Низкая скорость" in label_text or "Низкая скорость" in label.get_attribute("innerHTML", "")) and \
@@ -504,11 +430,11 @@ class FormFiller:
                         self.logger.info(f"⚠️ Label в main document не подходит: '{label_text}'")
             except:
                 self.logger.info("🔍 Label не найден в main document")
-            
+
             # Теперь ищем все iframe'ы на странице
             iframes = self.driver.find_elements("tag name", "iframe")
             self.logger.info(f"📋 Найдено {len(iframes)} iframe'ов на странице")
-            
+
             for i, iframe in enumerate(iframes):
                 try:
                     self.logger.info(f"🔍 Проверяем iframe {i+1}/{len(iframes)}...")
