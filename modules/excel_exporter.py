@@ -21,12 +21,64 @@ class ExcelExporter:
         # Отключаем Google логи в консоли
         self._disable_google_logs()
 
+    def _disable_google_logs(self):
+        """Отключить Google логи в консоли"""
+        try:
+            # Устанавливаем переменные окружения для отключения логов
+            os.environ['WDM_LOG_LEVEL'] = '0'
+            os.environ['WDM_PRINT_FIRST_LINE'] = 'False'
+
+            # Выполняем JavaScript для отключения console.log от Google
+            js_code = """
+            // Отключаем Google логи
+            if (typeof console !== 'undefined') {
+                const originalLog = console.log;
+                const originalWarn = console.warn;
+                const originalError = console.error;
+
+                console.log = function(...args) {
+                    const message = args.join(' ');
+                    if (!message.includes('google_apis') &&
+                        !message.includes('voice_transcription') &&
+                        !message.includes('AiaRequest') &&
+                        !message.includes('Registration response error') &&
+                        !message.includes('WARNING: All log messages')) {
+                        originalLog.apply(console, args);
+                    }
+                };
+
+                console.warn = function(...args) {
+                    const message = args.join(' ');
+                    if (!message.includes('google_apis') &&
+                        !message.includes('voice_transcription') &&
+                        !message.includes('AiaRequest') &&
+                        !message.includes('Registration response error')) {
+                        originalWarn.apply(console, args);
+                    }
+                };
+
+                console.error = function(...args) {
+                    const message = args.join(' ');
+                    if (!message.includes('google_apis') &&
+                        !message.includes('voice_transcription') &&
+                        !message.includes('AiaRequest') &&
+                        !message.includes('Registration response error')) {
+                        originalError.apply(console, args);
+                    }
+                };
+            }
+            """
+            self.driver.execute_script(js_code)
+            self.logger.info("🔇 Google логи отключены")
+        except Exception as e:
+            self.logger.warning(f"⚠️ Не удалось отключить Google логи: {e}")
+
     def wait_for_report_ready(self, timeout=120):
-        """Дождаться готовности отчета через проверку по промежуткам"""
+        """Дождаться готовности отчета с использованием Explicit Waits"""
         try:
             self.logger.info("⏳ Ждем готовности отчета...")
 
-            # Сначала ждем полной загрузки страницы
+            # 1. Ждем полной загрузки страницы
             self.logger.info("⏳ Ждем полной загрузки страницы...")
             try:
                 WebDriverWait(self.driver, 30).until(
@@ -36,45 +88,56 @@ class ExcelExporter:
             except:
                 self.logger.warning("⚠️ Страница не загрузилась полностью, продолжаем...")
 
-            # Проверяем каждые 5 секунд в течение timeout
-            check_interval = 5
-            max_checks = timeout // check_interval
+            # 2. Ждем появления элементов экспорта через Explicit Wait
+            self.logger.info("⏳ Ждем появления элементов экспорта...")
+            try:
+                # Ждем появления ActiveLink элементов
+                WebDriverWait(self.driver, 30).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "a.ActiveLink"))
+                )
+                self.logger.info("✅ ActiveLink элементы найдены")
+            except:
+                self.logger.warning("⚠️ ActiveLink элементы не найдены, продолжаем...")
 
-            for check_num in range(max_checks):
-                self.logger.info(f"🔍 Проверка {check_num + 1}/{max_checks} - ищем кнопку экспорта...")
+            # 3. Ждем появления элементов с exportReport функциями
+            try:
+                WebDriverWait(self.driver, 30).until(
+                    lambda driver: len(driver.find_elements(By.CSS_SELECTOR, "a[onclick*='exportReport']")) > 0
+                )
+                self.logger.info("✅ Элементы с exportReport найдены")
+            except:
+                self.logger.warning("⚠️ Элементы с exportReport не найдены, продолжаем...")
 
-                # Сначала пробуем найти по тексту (более надежно)
-                export_button = self.find_export_button_by_text()
-                if export_button:
-                    self.logger.info("✅ Кнопка экспорта найдена по тексту")
-                    self.logger.info("✅ Отчет готов к экспорту")
-                    return True
+            # 4. Финальная проверка - ищем кнопку экспорта
+            self.logger.info("🔍 Выполняем финальную проверку...")
 
-                # Если не найдено по тексту, пробуем CSS селекторы
-                export_selectors = [
-                    "a[onclick*='exportReport']",
-                    "a[onclick*='EXCELOPENXML']",
-                    "a[class*='ActiveLink']",
-                    "div[id*='Export'] a",
-                    "div[class*='ToolbarExport'] a"
-                ]
+            # Пробуем найти по тексту
+            export_button = self.find_export_button_by_text()
+            if export_button:
+                self.logger.info("✅ Кнопка экспорта найдена по тексту")
+                self.logger.info("✅ Отчет готов к экспорту")
+                return True
 
-                for selector in export_selectors:
-                    try:
-                        export_button = self.driver.find_element(By.CSS_SELECTOR, selector)
-                        if export_button.is_enabled():  # Убрали проверку is_displayed()
-                            self.logger.info(f"✅ Кнопка экспорта найдена: {selector}")
-                            self.logger.info("✅ Отчет готов к экспорту")
-                            return True
-                    except:
-                        continue
+            # Пробуем CSS селекторы
+            export_selectors = [
+                "a[onclick*='exportReport']",
+                "a[onclick*='EXCELOPENXML']",
+                "a[class*='ActiveLink']",
+                "div[id*='Export'] a",
+                "div[class*='ToolbarExport'] a"
+            ]
 
-                # Если кнопка не найдена, ждем и проверяем снова
-                if check_num < max_checks - 1:  # Не ждем после последней проверки
-                    self.logger.info(f"⏳ Кнопка экспорта не найдена, ждем {check_interval} секунд...")
-                    time.sleep(check_interval)
+            for selector in export_selectors:
+                try:
+                    export_button = self.driver.find_element(By.CSS_SELECTOR, selector)
+                    if export_button.is_enabled():
+                        self.logger.info(f"✅ Кнопка экспорта найдена: {selector}")
+                        self.logger.info("✅ Отчет готов к экспорту")
+                        return True
+                except:
+                    continue
 
-            self.logger.error(f"❌ Отчет не загрузился за {timeout} секунд")
+            self.logger.error("❌ Кнопка экспорта не найдена после всех проверок")
             return False
 
         except Exception as e:
@@ -187,37 +250,45 @@ class ExcelExporter:
             return False
 
     def export_to_excel(self, wait_time=120):
-        """Экспортировать отчет в Excel (улучшенная версия)"""
+        """Экспортировать отчет в Excel (исправленная версия)"""
         try:
             self.logger.info("📤 Начинаем экспорт отчета в Excel...")
 
-            # Ждем готовности отчета
+            # 1. Сначала проверяем iframe и переключаемся в нужный контекст
+            self.logger.info("🔍 Проверяем iframe и контекст страницы...")
+            iframe_found = self.check_and_switch_iframe()
+
+            # 2. Ждем готовности отчета (после переключения в iframe)
             if not self.wait_for_report_ready(timeout=wait_time):
                 return False
 
-                                    # 1. Проверяем iframe и переключаемся в нужный контекст
-            self.logger.info("🔍 Проверяем iframe и контекст страницы...")
-            iframe_found = self.check_and_switch_iframe()
-            
-            # 2. Показываем диагностику элементов экспорта
+            # 3. Ждем появления ReportViewerControl через Explicit Wait
+            self.logger.info("⏳ Ждем появления ReportViewerControl...")
+            try:
+                WebDriverWait(self.driver, 30).until(
+                    lambda driver: driver.execute_script("return typeof $find !== 'undefined' && $find('ReportViewerControl') !== null")
+                )
+                self.logger.info("✅ ReportViewerControl найден")
+            except:
+                self.logger.warning("⚠️ ReportViewerControl не найден, продолжаем...")
+
+            # 4. Показываем диагностику элементов экспорта
             self.logger.info("🔍 Анализируем доступные элементы экспорта...")
             export_elements = self.find_export_elements_via_js()
-            
-            # 3. Пробуем прямой клик через JavaScript (как в вашем тесте)
-            self.logger.info("🚀 Пробуем прямой экспорт через JavaScript...")
+
+            # 5. Пробуем прямой вызов API (приоритетный метод)
+            self.logger.info("🚀 Пробуем прямой вызов exportReport API...")
+            if self.call_export_report_api():
+                self.logger.info("✅ Экспорт в Excel запущен через API")
+                return True
+
+            # 6. Если API не сработал, пробуем JavaScript клик
+            self.logger.info("🔄 Пробуем JavaScript клик...")
             if self.click_excel_export_via_js():
                 self.logger.info("✅ Экспорт в Excel запущен через JavaScript")
                 return True
-            
-            # 4. Если JavaScript не сработал, но iframe найден, пробуем поиск в iframe
-            if iframe_found:
-                self.logger.info("🔄 Iframe найден, пробуем поиск Excel кнопки в iframe...")
-                # Остаемся в iframe для поиска
-            else:
-                self.logger.info("🔄 Iframe не найден, возвращаемся в основной контекст...")
-                self.driver.switch_to.default_content()
 
-            # 3. Если JavaScript не сработал, используем стандартный подход
+            # 7. Если JavaScript не сработал, используем стандартный подход
             self.logger.info("🔄 Используем стандартный подход через Selenium...")
 
             # Ищем кнопку экспорта через обновленный метод
@@ -288,7 +359,7 @@ class ExcelExporter:
                 exportElements: []
             };
 
-            // 1. Поиск по ActiveLink классу
+            // 1. Поиск по ActiveLink классу (исправленный селектор)
             console.log('1. Поиск по ActiveLink...');
             const activeLinks = document.querySelectorAll('a.ActiveLink');
             console.log('Найдено ActiveLink элементов:', activeLinks.length);
@@ -432,6 +503,67 @@ class ExcelExporter:
             self.logger.error(f"❌ Ошибка при поиске через JavaScript: {e}")
             return None
 
+    def call_export_report_api(self):
+        """Прямой вызов exportReport API (приоритетный метод)"""
+        try:
+            self.logger.info("🚀 Пытаемся вызвать exportReport API напрямую...")
+
+            # Проверяем доступность ReportViewerControl
+            api_check = self.driver.execute_script("""
+                try {
+                    if (typeof $find !== 'undefined') {
+                        const control = $find('ReportViewerControl');
+                        if (control && typeof control.exportReport === 'function') {
+                            return {
+                                available: true,
+                                controlType: control.constructor.name,
+                                methods: Object.getOwnPropertyNames(control).filter(name =>
+                                    typeof control[name] === 'function'
+                                )
+                            };
+                        }
+                    }
+                    return { available: false, reason: 'ReportViewerControl не найден или exportReport недоступен' };
+                } catch (e) {
+                    return { available: false, reason: e.message };
+                }
+            """)
+
+            if not api_check.get('available'):
+                self.logger.warning(f"⚠️ API недоступен: {api_check.get('reason', 'Неизвестная причина')}")
+                return False
+
+            self.logger.info(f"✅ API доступен: {api_check.get('controlType', 'Неизвестно')}")
+            if api_check.get('methods'):
+                self.logger.info(f"📋 Доступные методы: {', '.join(api_check['methods'][:10])}")
+
+            # Пытаемся вызвать exportReport
+            export_result = self.driver.execute_script("""
+                try {
+                    const control = $find('ReportViewerControl');
+                    if (control && control.exportReport) {
+                        // Сначала пробуем EXCELOPENXML
+                        control.exportReport('EXCELOPENXML');
+                        return { success: true, format: 'EXCELOPENXML', method: 'direct_api_call' };
+                    }
+                } catch (e) {
+                    return { success: false, error: e.message, method: 'direct_api_call' };
+                }
+                return { success: false, error: 'exportReport метод недоступен' };
+            """)
+
+            if export_result and export_result.get('success'):
+                self.logger.info(f"✅ Экспорт запущен через API: {export_result.get('format', 'Неизвестно')}")
+                return True
+            else:
+                error = export_result.get('error', 'Неизвестная ошибка') if export_result else 'Нет результата'
+                self.logger.warning(f"⚠️ API вызов не удался: {error}")
+                return False
+
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при вызове API: {e}")
+            return False
+
     def check_and_switch_iframe(self):
         """Проверить iframe и переключиться в нужный контекст"""
         try:
@@ -460,7 +592,9 @@ class ExcelExporter:
                             url: window.location.href,
                             hasExportElements: document.querySelectorAll('a[onclick*="exportReport"]').length > 0,
                             hasActiveLinks: document.querySelectorAll('a.ActiveLink').length > 0,
-                            hasExcelText: document.querySelector('a:contains("Excel")') !== null
+                            hasExcelText: Array.from(document.querySelectorAll('a')).some(el =>
+                                el.textContent.includes('Excel') || el.textContent.includes('excel')
+                            )
                         };
                     """)
 
@@ -500,72 +634,6 @@ class ExcelExporter:
                 pass
             return False
 
-    def _disable_google_logs(self):
-        """Отключить Google логи в консоли (усиленная версия)"""
-        try:
-            # Устанавливаем переменные окружения для отключения логов
-            os.environ['WDM_LOG_LEVEL'] = '0'
-            os.environ['WDM_PRINT_FIRST_LINE'] = 'False'
-            os.environ['GOOGLE_API_LOG_LEVEL'] = '0'
-            
-            # Выполняем JavaScript для отключения console.log от Google
-            js_code = """
-            // Отключаем Google логи (усиленная версия)
-            if (typeof console !== 'undefined') {
-                const originalLog = console.log;
-                const originalWarn = console.warn;
-                const originalError = console.error;
-                
-                const googlePatterns = [
-                    'google_apis', 'voice_transcription', 'AiaRequest', 
-                    'Registration response error', 'WARNING: All log messages',
-                    'absl::InitializeLog', 'DevTools listening', 'ws://127.0.0.1',
-                    'chrome_', 'gcm', 'engine', 'registration_request'
-                ];
-                
-                function shouldBlockMessage(message) {
-                    return googlePatterns.some(pattern => 
-                        message.toLowerCase().includes(pattern.toLowerCase())
-                    );
-                }
-                
-                console.log = function(...args) {
-                    const message = args.join(' ');
-                    if (!shouldBlockMessage(message)) {
-                        originalLog.apply(console, args);
-                    }
-                };
-                
-                console.warn = function(...args) {
-                    const message = args.join(' ');
-                    if (!shouldBlockMessage(message)) {
-                        originalWarn.apply(console, args);
-                    }
-                };
-                
-                console.error = function(...args) {
-                    const message = args.join(' ');
-                    if (!shouldBlockMessage(message)) {
-                        originalError.apply(console, args);
-                    }
-                };
-            }
-            
-            // Отключаем DevTools логи
-            if (typeof window !== 'undefined') {
-                window.addEventListener('error', function(e) {
-                    if (e.message && shouldBlockMessage(e.message)) {
-                        e.preventDefault();
-                        return false;
-                    }
-                });
-            }
-            """
-            self.driver.execute_script(js_code)
-            self.logger.info("🔇 Google логи отключены (усиленная версия)")
-        except Exception as e:
-            self.logger.warning(f"⚠️ Не удалось отключить Google логи: {e}")
-
     def find_export_elements_via_js(self):
         """Найти все элементы с exportReport через JavaScript"""
         try:
@@ -601,17 +669,34 @@ class ExcelExporter:
             return []
 
     def click_excel_export_via_js(self):
-        """Нажать на Excel экспорт через JavaScript"""
+        """Нажать на Excel экспорт через JavaScript (исправленная версия)"""
         try:
             self.logger.info("🖱️ Пытаемся нажать Excel экспорт через JavaScript...")
 
             js_code = """
-            // 1. Находим Excel кнопку
-            const excelLink = document.querySelector('a.ActiveLink[text="Excel"]') ||
-                              Array.from(document.querySelectorAll('a.ActiveLink')).find(el => el.textContent.includes('Excel'));
+            // 1. Находим Excel кнопку (исправленный селектор)
+            const excelLink = Array.from(document.querySelectorAll('a.ActiveLink')).find(el =>
+                el.textContent.includes('Excel') || el.textContent.includes('excel')
+            );
 
             if (excelLink) {
                 try {
+                    // Проверяем, нужно ли сначала раскрыть меню
+                    const parentMenu = excelLink.closest('[class*="Menu"], [class*="dropdown"], [class*="MenuBar"]');
+                    if (parentMenu && parentMenu.style.display === 'none') {
+                        // Ищем кнопку для раскрытия меню
+                        const menuToggle = document.querySelector('[onclick*="toggle"], [onclick*="show"], [onclick*="open"]');
+                        if (menuToggle) {
+                            menuToggle.click();
+                            // Ждем появления меню
+                            setTimeout(() => {
+                                excelLink.click();
+                            }, 500);
+                            return { success: true, method: 'ActiveLink_with_menu_toggle', text: excelLink.textContent };
+                        }
+                    }
+
+                    // Обычный клик
                     excelLink.click();
                     return { success: true, method: 'ActiveLink', text: excelLink.textContent };
                 } catch (e) {
