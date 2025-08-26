@@ -3,6 +3,7 @@
 """
 
 from selenium.webdriver.support.ui import Select
+from selenium.webdriver.common.by import By
 from loguru import logger
 import time
 
@@ -219,11 +220,24 @@ class FormFiller:
                     self.logger.error("❌ Кнопка выпадающего списка не найдена")
                     return False
 
+                # Детальная диагностика кнопки выпадающего списка
+                self.logger.info(f"📋 Кнопка выпадающего списка найдена:")
+                self.logger.info(f"   • Селектор: {dropdown_toggle_selector}")
+                self.logger.info(f"   • Текст: '{dropdown_toggle.text}'")
+                self.logger.info(f"   • Класс: {dropdown_toggle.get_attribute('class')}")
+                self.logger.info(f"   • ID: {dropdown_toggle.get_attribute('id')}")
+                self.logger.info(f"   • Видима: {dropdown_toggle.is_displayed()}")
+                self.logger.info(f"   • Кликабельна: {dropdown_toggle.is_enabled()}")
+
                 self.logger.info("📋 Открываем выпадающий список причины обращения...")
                 dropdown_toggle.click()
 
                 # Ждем появления выпадающего списка
                 time.sleep(2)
+                
+                # Анализируем все доступные варианты в выпадающем списке
+                self.logger.info("🔍 Анализируем все доступные варианты в выпадающем списке...")
+                self._analyze_dropdown_options()
 
                 # 2. Теперь нажимаем "Выделить все" чтобы снять все галочки
                 select_all_selector = self.form_elements.get_dropdown_selector('reason_select_all')
@@ -235,6 +249,16 @@ class FormFiller:
                 if not select_all_checkbox:
                     self.logger.error("❌ Чекбокс 'Выделить все' не найден")
                     return False
+
+                # Детальная диагностика чекбокса "Выделить все"
+                self.logger.info(f"🗑️ Чекбокс 'Выделить все' найден:")
+                self.logger.info(f"   • Селектор: {select_all_selector}")
+                self.logger.info(f"   • Текст: '{select_all_checkbox.text}'")
+                self.logger.info(f"   • Класс: {select_all_checkbox.get_attribute('class')}")
+                self.logger.info(f"   • ID: {select_all_checkbox.get_attribute('id')}")
+                self.logger.info(f"   • Выбран: {select_all_checkbox.is_selected()}")
+                self.logger.info(f"   • Видим: {select_all_checkbox.is_displayed()}")
+                self.logger.info(f"   • Кликабелен: {select_all_checkbox.is_enabled()}")
 
                 self.logger.info("🗑️ Снимаем все галочки через 'Выделить все'...")
                 select_all_checkbox.click()
@@ -252,6 +276,16 @@ class FormFiller:
                 if not checkbox:
                     self.logger.error("❌ Чекбокс 'Низкая скорость в 3G/4G' не найден")
                     return False
+
+                # Детальная диагностика основного чекбокса
+                self.logger.info(f"✅ Основной чекбокс найден:")
+                self.logger.info(f"   • Селектор: {checkbox_selector}")
+                self.logger.info(f"   • Текст: '{checkbox.text}'")
+                self.logger.info(f"   • Класс: {checkbox.get_attribute('class')}")
+                self.logger.info(f"   • ID: {checkbox.get_attribute('id')}")
+                self.logger.info(f"   • Выбран: {checkbox.is_selected()}")
+                self.logger.info(f"   • Видим: {checkbox.is_displayed()}")
+                self.logger.info(f"   • Кликабелен: {checkbox.is_enabled()}")
 
                 # Проверяем, не выбран ли уже чекбокс
                 if not checkbox.is_selected():
@@ -315,3 +349,42 @@ class FormFiller:
             except:
                 pass
             return False
+
+    def _analyze_dropdown_options(self):
+        """Анализировать все доступные варианты в выпадающем списке"""
+        try:
+            # Ищем все чекбоксы в выпадающем списке
+            all_checkboxes = self.driver.find_elements(By.CSS_SELECTOR, "input[type='checkbox']")
+            
+            if not all_checkboxes:
+                self.logger.warning("⚠️ Чекбоксы в выпадающем списке не найдены")
+                return
+            
+            self.logger.info(f"📋 Найдено {len(all_checkboxes)} чекбоксов в выпадающем списке:")
+            
+            for i, checkbox in enumerate(all_checkboxes):
+                try:
+                    # Получаем родительский элемент для текста
+                    parent = checkbox.find_element(By.XPATH, "./..")
+                    text = parent.text.strip() if parent else "Без текста"
+                    
+                    # Получаем атрибуты чекбокса
+                    checkbox_id = checkbox.get_attribute('id') or 'Нет ID'
+                    checkbox_class = checkbox.get_attribute('class') or 'Нет класса'
+                    is_selected = checkbox.is_selected()
+                    is_displayed = checkbox.is_displayed()
+                    is_enabled = checkbox.is_enabled()
+                    
+                    self.logger.info(f"   • Чекбокс {i+1}:")
+                    self.logger.info(f"     - Текст: '{text}'")
+                    self.logger.info(f"     - ID: {checkbox_id}")
+                    self.logger.info(f"     - Класс: {checkbox_class}")
+                    self.logger.info(f"     - Выбран: {is_selected}")
+                    self.logger.info(f"     - Видим: {is_displayed}")
+                    self.logger.info(f"     - Кликабелен: {is_enabled}")
+                    
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Не удалось проанализировать чекбокс {i+1}: {e}")
+                    
+        except Exception as e:
+            self.logger.warning(f"⚠️ Ошибка при анализе вариантов выпадающего списка: {e}")

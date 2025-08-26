@@ -21,58 +21,6 @@ class ExcelExporter:
         # Отключаем Google логи в консоли
         self._disable_google_logs()
 
-    def _disable_google_logs(self):
-        """Отключить Google логи в консоли"""
-        try:
-            # Устанавливаем переменные окружения для отключения логов
-            os.environ['WDM_LOG_LEVEL'] = '0'
-            os.environ['WDM_PRINT_FIRST_LINE'] = 'False'
-
-            # Выполняем JavaScript для отключения console.log от Google
-            js_code = """
-            // Отключаем Google логи
-            if (typeof console !== 'undefined') {
-                const originalLog = console.log;
-                const originalWarn = console.warn;
-                const originalError = console.error;
-
-                console.log = function(...args) {
-                    const message = args.join(' ');
-                    if (!message.includes('google_apis') &&
-                        !message.includes('voice_transcription') &&
-                        !message.includes('AiaRequest') &&
-                        !message.includes('Registration response error') &&
-                        !message.includes('WARNING: All log messages')) {
-                        originalLog.apply(console, args);
-                    }
-                };
-
-                console.warn = function(...args) {
-                    const message = args.join(' ');
-                    if (!message.includes('google_apis') &&
-                        !message.includes('voice_transcription') &&
-                        !message.includes('AiaRequest') &&
-                        !message.includes('Registration response error')) {
-                        originalWarn.apply(console, args);
-                    }
-                };
-
-                console.error = function(...args) {
-                    const message = args.join(' ');
-                    if (!message.includes('google_apis') &&
-                        !message.includes('voice_transcription') &&
-                        !message.includes('AiaRequest') &&
-                        !message.includes('Registration response error')) {
-                        originalError.apply(console, args);
-                    }
-                };
-            }
-            """
-            self.driver.execute_script(js_code)
-            self.logger.info("🔇 Google логи отключены")
-        except Exception as e:
-            self.logger.warning(f"⚠️ Не удалось отключить Google логи: {e}")
-
     def wait_for_report_ready(self, timeout=120):
         """Дождаться готовности отчета через проверку по промежуткам"""
         try:
@@ -247,19 +195,27 @@ class ExcelExporter:
             if not self.wait_for_report_ready(timeout=wait_time):
                 return False
 
-                        # 1. Проверяем iframe и переключаемся в нужный контекст
+                                    # 1. Проверяем iframe и переключаемся в нужный контекст
             self.logger.info("🔍 Проверяем iframe и контекст страницы...")
             iframe_found = self.check_and_switch_iframe()
-
+            
             # 2. Показываем диагностику элементов экспорта
             self.logger.info("🔍 Анализируем доступные элементы экспорта...")
             export_elements = self.find_export_elements_via_js()
-
+            
             # 3. Пробуем прямой клик через JavaScript (как в вашем тесте)
             self.logger.info("🚀 Пробуем прямой экспорт через JavaScript...")
             if self.click_excel_export_via_js():
                 self.logger.info("✅ Экспорт в Excel запущен через JavaScript")
                 return True
+            
+            # 4. Если JavaScript не сработал, но iframe найден, пробуем поиск в iframe
+            if iframe_found:
+                self.logger.info("🔄 Iframe найден, пробуем поиск Excel кнопки в iframe...")
+                # Остаемся в iframe для поиска
+            else:
+                self.logger.info("🔄 Iframe не найден, возвращаемся в основной контекст...")
+                self.driver.switch_to.default_content()
 
             # 3. Если JavaScript не сработал, используем стандартный подход
             self.logger.info("🔄 Используем стандартный подход через Selenium...")
@@ -543,6 +499,72 @@ class ExcelExporter:
             except:
                 pass
             return False
+
+    def _disable_google_logs(self):
+        """Отключить Google логи в консоли (усиленная версия)"""
+        try:
+            # Устанавливаем переменные окружения для отключения логов
+            os.environ['WDM_LOG_LEVEL'] = '0'
+            os.environ['WDM_PRINT_FIRST_LINE'] = 'False'
+            os.environ['GOOGLE_API_LOG_LEVEL'] = '0'
+            
+            # Выполняем JavaScript для отключения console.log от Google
+            js_code = """
+            // Отключаем Google логи (усиленная версия)
+            if (typeof console !== 'undefined') {
+                const originalLog = console.log;
+                const originalWarn = console.warn;
+                const originalError = console.error;
+                
+                const googlePatterns = [
+                    'google_apis', 'voice_transcription', 'AiaRequest', 
+                    'Registration response error', 'WARNING: All log messages',
+                    'absl::InitializeLog', 'DevTools listening', 'ws://127.0.0.1',
+                    'chrome_', 'gcm', 'engine', 'registration_request'
+                ];
+                
+                function shouldBlockMessage(message) {
+                    return googlePatterns.some(pattern => 
+                        message.toLowerCase().includes(pattern.toLowerCase())
+                    );
+                }
+                
+                console.log = function(...args) {
+                    const message = args.join(' ');
+                    if (!shouldBlockMessage(message)) {
+                        originalLog.apply(console, args);
+                    }
+                };
+                
+                console.warn = function(...args) {
+                    const message = args.join(' ');
+                    if (!shouldBlockMessage(message)) {
+                        originalWarn.apply(console, args);
+                    }
+                };
+                
+                console.error = function(...args) {
+                    const message = args.join(' ');
+                    if (!shouldBlockMessage(message)) {
+                        originalError.apply(console, args);
+                    }
+                };
+            }
+            
+            // Отключаем DevTools логи
+            if (typeof window !== 'undefined') {
+                window.addEventListener('error', function(e) {
+                    if (e.message && shouldBlockMessage(e.message)) {
+                        e.preventDefault();
+                        return false;
+                    }
+                });
+            }
+            """
+            self.driver.execute_script(js_code)
+            self.logger.info("🔇 Google логи отключены (усиленная версия)")
+        except Exception as e:
+            self.logger.warning(f"⚠️ Не удалось отключить Google логи: {e}")
 
     def find_export_elements_via_js(self):
         """Найти все элементы с exportReport через JavaScript"""
