@@ -255,14 +255,14 @@ class FormFiller:
 
                                 # Ждем применения изменений и исчезновения модального окна
                 self.logger.info("⏳ Ждем применения изменений и исчезновения модального окна...")
-                
+
                 # Ждем исчезновения модального окна ожидания
                 wait_time = 10
                 start_time = time.time()
                 while time.time() - start_time < wait_time:
                     try:
                         # Ищем модальное окно ожидания
-                        modal = self.driver.find_element("xpath", 
+                        modal = self.driver.find_element("xpath",
                             "//div[contains(@class, 'wait-indicator-dialog') and contains(@class, 'in')]")
                         if modal.is_displayed():
                             self.logger.info("⏳ Модальное окно ожидания активно, ждем...")
@@ -275,33 +275,33 @@ class FormFiller:
                         # Модальное окно не найдено - значит исчезло
                         self.logger.info("✅ Модальное окно ожидания не найдено")
                         break
-                
+
                 # Дополнительная задержка для стабилизации
                 time.sleep(2)
                 self.logger.info("✅ Готовы к выбору чекбокса")
 
-                # 3. Теперь выбираем нужный чекбокс (пробуем label, затем fallback)
+                                # 3. Теперь выбираем нужный чекбокс (пробуем label, затем fallback)
                 self.logger.info("🔍 Ищем чекбокс 'Низкая скорость в 3G/4G'...")
 
                 # Пробуем найти по label тексту (тихо, без ошибок в логах)
                 checkbox = None
                 try:
-                    self.logger.info("🔍 Попытка 1: поиск по точному тексту label...")
-
-                    # Ищем label с ТОЧНЫМ текстом (строго по названию) В IFRAME
+                    self.logger.info("🔍 Попытка 1: поиск по точному тексту label во всех iframe...")
+                    
+                    # Ищем label с ТОЧНЫМ текстом (строго по названию) ВО ВСЕХ IFRAME
                     label_xpath = """//label[
                         normalize-space(text()) = 'Интернет >> Низкая скорость в 3G/4G' or
                         normalize-space(.) = 'Интернет >> Низкая скорость в 3G/4G' or
                         normalize-space(text()) = 'Интернет&nbsp;&gt;&gt;&nbsp;Низкая&nbsp;скорость&nbsp;в&nbsp;3G/4G' or
                         normalize-space(.) = 'Интернет&nbsp;&gt;&gt;&nbsp;Низкая&nbsp;скорость&nbsp;в&nbsp;3G/4G'
                     ]"""
-
+                    
                     self.logger.info(f"🔍 XPath для поиска: {label_xpath}")
-
-                    # Ищем через iframe_handler, а не через driver напрямую
-                    label = self.iframe_handler.find_element_in_iframe(("xpath", label_xpath))
+                    
+                    # Ищем во всех доступных iframe'ах
+                    label = self._find_label_in_all_iframes(label_xpath)
                     if not label:
-                        raise Exception("Label не найден в iframe")
+                        raise Exception("Label не найден ни в одном iframe")
 
                     # Дополнительная проверка - убеждаемся что это именно нужный label
                     label_text = label.text.strip()
@@ -399,10 +399,10 @@ class FormFiller:
                 # Проверяем, не выбран ли уже чекбокс
                 if not checkbox.is_selected():
                     self.logger.info("✅ Выбираем чекбокс 'Низкая скорость в 3G/4G'...")
-                    
+
                     # Проверяем что нет блокирующих модальных окон
                     try:
-                        blocking_modal = self.driver.find_element("xpath", 
+                        blocking_modal = self.driver.find_element("xpath",
                             "//div[contains(@class, 'modal') and contains(@class, 'in') and @style*='display: block']")
                         if blocking_modal.is_displayed():
                             self.logger.warning("⚠️ Обнаружено блокирующее модальное окно, ждем исчезновения...")
@@ -410,7 +410,7 @@ class FormFiller:
                     except:
                         # Модальное окно не найдено - можно кликать
                         pass
-                    
+
                     # Пробуем клик с проверкой на блокировку
                     try:
                         checkbox.click()
@@ -447,6 +447,66 @@ class FormFiller:
             except:
                 pass
             return False
+
+    def _find_label_in_all_iframes(self, label_xpath):
+        """Найти label во всех доступных iframe'ах"""
+        try:
+            self.logger.info("🔍 Поиск label во всех iframe'ах...")
+            
+            # Возвращаемся в основной документ для поиска всех iframe'ов
+            self.iframe_handler.switch_to_main_document()
+            
+            # Ищем все iframe'ы на странице
+            iframes = self.driver.find_elements("tag name", "iframe")
+            self.logger.info(f"📋 Найдено {len(iframes)} iframe'ов на странице")
+            
+            for i, iframe in enumerate(iframes):
+                try:
+                    self.logger.info(f"🔍 Проверяем iframe {i+1}/{len(iframes)}...")
+                    
+                    # Переключаемся на iframe
+                    self.driver.switch_to.frame(iframe)
+                    
+                    # Ищем label в текущем iframe
+                    try:
+                        label = self.driver.find_element("xpath", label_xpath)
+                        if label and label.is_displayed():
+                            label_text = label.text.strip()
+                            self.logger.info(f"✅ Label найден в iframe {i+1}: '{label_text}'")
+                            
+                            # Проверяем что это нужный label
+                            if "Интернет" in label_text and "Низкая скорость" in label_text and "3G/4G" in label_text:
+                                self.logger.info(f"🎯 Найден правильный label в iframe {i+1}!")
+                                return label
+                            else:
+                                self.logger.info(f"⚠️ Label в iframe {i+1} не подходит: '{label_text}'")
+                    except:
+                        # Label не найден в этом iframe
+                        pass
+                    
+                    # Возвращаемся в основной документ для следующего iframe
+                    self.driver.switch_to.default_content()
+                    
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Ошибка при проверке iframe {i+1}: {e}")
+                    # Возвращаемся в основной документ
+                    try:
+                        self.driver.switch_to.default_content()
+                    except:
+                        pass
+                    continue
+            
+            self.logger.warning("⚠️ Label не найден ни в одном iframe")
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка при поиске во всех iframe'ах: {e}")
+            # Возвращаемся в основной документ
+            try:
+                self.driver.switch_to.default_content()
+            except:
+                pass
+            return None
 
     def submit_report(self):
         """Отправить отчет"""
