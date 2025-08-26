@@ -13,9 +13,9 @@ import time
 class FormFiller:
     """Класс для заполнения формы отчета"""
 
-    # Устойчивые локаторы для ReportViewer dropdown
+        # Устойчивые локаторы для ReportViewer dropdown
     DROPDOWN_ROOT = (
-        By.XPATH,
+        "xpath",
         "//div[starts-with(@id,'ReportViewerControl_') and contains(@id,'_divDropDown')]"
     )
     
@@ -300,13 +300,13 @@ class FormFiller:
 
                 # 3. ⚠️ ВАЖНЫЙ ПЕРЕХОД из iframe в корень, дальше ищем не в iframe
                 self.logger.info("🔄 Переходим в корень страницы для поиска label в dropdown...")
-                
+
                 # Если после "Выделить все" dropdown закрылся — переоткроем
                 select_ok = self.select_reason_label("#ReportViewerControl_ctl04_ctl23_divDropDown_ctl00")
                 if not select_ok:
                     self.logger.error("❌ Label 'Интернет >> Низкая скорость в 3G/4G' не найден внутри dropdown")
                     return False
-                
+
                 self.logger.info("✅ Причина обращения установлена: Низкая скорость в 3G/4G")
                 return True
 
@@ -483,7 +483,7 @@ class FormFiller:
     def _open_dropdown_again_if_closed(self, toggle_in_iframe_locator, timeout=10):
         """Если корневого dropdown нет/невидим — снова кликаем toggle внутри iframe"""
         try:
-            root = self.driver.find_element(*self.DROPDOWN_ROOT)
+            root = self.driver.find_element(self.DROPDOWN_ROOT[0], self.DROPDOWN_ROOT[1])
             if not root.is_displayed():
                 self.logger.info("🔄 Dropdown невидим, переоткрываем...")
                 # Возвращаемся в iframe для клика
@@ -500,18 +500,18 @@ class FormFiller:
             toggle.click()
             # Возвращаемся в корень
             self.driver.switch_to.default_content()
-        
+
         # Ждем появления dropdown
         wait = WebDriverWait(self.driver, timeout)
-        root = wait.until(EC.visibility_of_element_located(self.DROPDOWN_ROOT))
+        root = wait.until(EC.visibility_of_element_located((self.DROPDOWN_ROOT[0], self.DROPDOWN_ROOT[1])))
         self.logger.info("✅ Dropdown открыт и видим")
 
     def _find_label_in_dropdown(self, timeout=10):
         """Найти label внутри контейнера dropdown"""
         try:
             wait = WebDriverWait(self.driver, timeout)
-            root = wait.until(EC.visibility_of_element_located(self.DROPDOWN_ROOT))
-            
+            root = wait.until(EC.visibility_of_element_located((self.DROPDOWN_ROOT[0], self.DROPDOWN_ROOT[1])))
+
             # У dropdown внутри есть прокручиваемая область <div style="overflow:auto">
             try:
                 scrollbox = root.find_element(By.XPATH, ".//div[descendant::table and contains(@style,'overflow')]")
@@ -519,7 +519,7 @@ class FormFiller:
             except:
                 scrollbox = root
                 self.logger.info("⚠️ Прокручиваемая область не найдена, используем весь dropdown")
-            
+
             # Пробуем найти сразу:
             try:
                 label = scrollbox.find_element(By.XPATH, self.LABEL_XPATH)
@@ -527,14 +527,14 @@ class FormFiller:
                 return label
             except:
                 self.logger.info("🔍 Label не найден сразу, выполняем пошаговый скролл...")
-                
+
                 # Если не видно, скроллим и ищем по шагам
                 total = self.driver.execute_script("return arguments[0].scrollHeight", scrollbox)
                 view = self.driver.execute_script("return arguments[0].clientHeight", scrollbox)
                 step = max(view // 2, 80)
-                
+
                 self.logger.info(f"📜 Высота: {total}, видимая: {view}, шаг: {step}")
-                
+
                 for y in range(0, total + step, step):
                     self.driver.execute_script("arguments[0].scrollTop = arguments[1];", scrollbox, y)
                     try:
@@ -544,10 +544,10 @@ class FormFiller:
                         return el
                     except:
                         continue
-                
+
                 self.logger.warning("⚠️ Label не найден даже после пошагового скролла")
                 return None
-                
+
         except Exception as e:
             self.logger.error(f"❌ Ошибка при поиске label в dropdown: {e}")
             return None
@@ -575,7 +575,7 @@ class FormFiller:
                 self.logger.info("✅ Label выбран через JavaScript")
 
             return True
-            
+
         except Exception as e:
             self.logger.error(f"❌ Ошибка при выборе label: {e}")
             return False
