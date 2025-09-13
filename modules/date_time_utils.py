@@ -6,6 +6,7 @@ import pytz
 from datetime import datetime, time as dtime, timedelta
 from typing import List, Tuple
 import pandas as pd
+from loguru import logger
 
 
 # === Timezone setup ===
@@ -41,6 +42,17 @@ def windows_for_row(row) -> List[Tuple[datetime, datetime]]:
     result = []
     start: datetime = row["Старт"]
     end: datetime = row["Окончание"]
+
+    # Проверяем на NaT значения
+    if pd.isna(start):
+        logger.warning(f"⚠️ Найдена строка с пустым значением 'Старт' - пропускаем")
+        return result
+
+    if pd.isna(end):
+        # Если нет даты окончания, считаем что инцидент еще не закрыт
+        # Обрабатываем только день начала
+        result.append((start, datetime.combine(start.date(), dtime(23, 59, 59))))
+        return result
 
     # Если инцидент в рамках одного дня
     if start.date() == end.date():
