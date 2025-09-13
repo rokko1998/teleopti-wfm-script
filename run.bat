@@ -1,6 +1,6 @@
 @echo off
 REM Use pushd to automatically map UNC path to a drive letter
-pushd "%~dp0"
+pushd "Z:\!_ Папки сотрудников\Шева\Ебота(\МР ебола\teleopti-wfm-script-main"
 
 REM Activate virtual environment
 call .venv\Scripts\activate.bat
