@@ -6,5 +6,6 @@ PyYAML>=6.0
 loguru>=0.7.0
 python-dateutil>=2.8.0
 openpyxl
+tqdm>=4.64.0
 # (и, если понадобится typer для CLI:)
 # typer[all]>=0.9.0

@@ -40,6 +40,7 @@ import argparse
 import yaml
 from pathlib import Path
 from loguru import logger
+from tqdm import tqdm
 
 # Импорты из наших модулей
 from modules.selenium_helpers import get_driver, setup_proxy, apply_cdp_download_settings
@@ -155,10 +156,23 @@ def main():
 
             logger.info(f"📊 Найдено {len(df_to_process)} проблем для даты {target_date.strftime('%d.%m.%Y')}")
 
-            # Обрабатываем каждую строку из выбранного DataFrame
-            for idx, row in df_to_process.iterrows():
+            # Обрабатываем каждую строку из выбранного DataFrame с индикатором прогресса
+            progress_bar = tqdm(
+                df_to_process.iterrows(),
+                total=len(df_to_process),
+                desc="Обработка проблем",
+                unit="строка",
+                colour="green",
+                bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]"
+            )
+
+            for idx, row in progress_bar:
                 region = row["Регион"]
                 mass_number = row["Номер массовой"]
+
+                # Обновляем описание прогресс-бара
+                progress_bar.set_description(f"Обработка: {mass_number} ({region})")
+
                 logger.info(f"🔄 Обрабатываем строку #{idx}: {mass_number} - {region}")
 
                 # Проверяем есть ли регион в конфигурации
@@ -237,17 +251,35 @@ def main():
                     logger.exception("   Полный traceback:")
                     continue
 
+            # Закрываем прогресс-бар
+            progress_bar.close()
+
             logger.info(f"🎉 Обработка завершена! Обработано {len(results)} проблем")
             logger.info(f"💾 Результаты сохранены в исходный файл: {input_xlsx_path}")
+            logger.info(f"📊 Статистика: {len(results)}/{len(df_to_process)} строк обработано успешно")
 
         else:
             # Стандартный режим: обработка всех проблем
             logger.info("📋 Используется стандартный режим обработки всех проблем")
 
-            # Обрабатываем каждую строку
-            for idx, row in df.iterrows():
+            # Обрабатываем каждую строку с индикатором прогресса
+            progress_bar = tqdm(
+                df.iterrows(),
+                total=len(df),
+                desc="Обработка проблем",
+                unit="строка",
+                colour="blue",
+                bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]"
+            )
+
+            for idx, row in progress_bar:
                 region = row["Регион"]
-                logger.info(f"🔄 Обрабатываем строку #{idx}: {row['Номер массовой']} - {region}")
+                mass_number = row["Номер массовой"]
+
+                # Обновляем описание прогресс-бара
+                progress_bar.set_description(f"Обработка: {mass_number} ({region})")
+
+                logger.info(f"🔄 Обрабатываем строку #{idx}: {mass_number} - {region}")
 
                 # Проверяем есть ли регион в конфигурации
                 if not validate_region_in_config(region, cfg):
@@ -274,23 +306,23 @@ def main():
                     logger.info(f"   win_end: {win_end}")
 
                     try:
-                        logger.info(f"🚀 Запускаем download_report для {row['Номер массовой']} {win_start.date()}")
+                        logger.info(f"🚀 Запускаем download_report для {mass_number} {win_start.date()}")
                         xlsx_path = download_report(driver, workload_params, win_start, win_end)
                         logger.info(f"📊 Обрабатываем метрики из файла: {xlsx_path}")
                         lost, excess = calc_metrics(xlsx_path)
 
                         # Создаем запись результата
                         result = create_result_record(
-                            row["Номер массовой"],
+                            mass_number,
                             win_start.date().isoformat(),
                             lost,
                             excess
                         )
                         results.append(result)
 
-                        logger.info(f"✅ Успешно обработан {row['Номер массовой']} - {region}: lost={lost}, excess={excess}")
+                        logger.info(f"✅ Успешно обработан {mass_number} - {region}: lost={lost}, excess={excess}")
                     except Exception as exc:
-                        logger.error(f"❌ ОШИБКА для строки #{idx} MassID {row['Номер массовой']} {region}")
+                        logger.error(f"❌ ОШИБКА для строки #{idx} MassID {mass_number} {region}")
                         try:
                             logger.error(f"   Период: {win_start.date()} - {win_end.date()}")
                         except:
@@ -299,8 +331,12 @@ def main():
                         logger.exception("   Полный traceback:")
                         continue
 
+            # Закрываем прогресс-бар
+            progress_bar.close()
+
             # Сохраняем в CSV файл (стандартный режим)
             save_results_to_csv(results, out_csv_path)
+            logger.info(f"📊 Статистика: {len(results)}/{len(df)} строк обработано успешно")
 
     finally:
         # Закрываем браузер
