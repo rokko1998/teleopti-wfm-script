@@ -1,11 +1,11 @@
 @echo off
-REM Get the directory where this batch file is located
-set "SCRIPT_DIR=%~dp0"
+REM Change to network drive Z:
+cd /d "Z:\!_ Папки сотрудников\Шева\Ебота(\МР ебола\teleopti-wfm-script-main"
 
-REM Activate virtual environment with full path
-call "%SCRIPT_DIR%.venv\Scripts\activate.bat"
+REM Activate virtual environment
+call .venv\Scripts\activate.bat
 
-REM Run Python script with full path
-python "%SCRIPT_DIR%main.py" "%SCRIPT_DIR%test08.xlsx" --auto-date-processing
+REM Run the script using Python from virtual environment explicitly
+.venv\Scripts\python.exe main.py test08.xlsx --auto-date-processing
 
 pause
