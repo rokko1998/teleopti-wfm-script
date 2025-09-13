@@ -6,6 +6,23 @@ echo ========================================
 echo  WFM Traffic Script - Запуск скрипта
 echo ========================================
 echo.
+echo [DEBUG] Текущая папка: %CD%
+echo [DEBUG] Проверяем наличие Python...
+
+REM Проверяем наличие Python
+python --version >nul 2>&1
+if errorlevel 1 (
+    echo [ОШИБКА] Python не найден!
+    echo Установите Python 3.8+ с официального сайта: https://python.org
+    echo Убедитесь, что Python добавлен в PATH
+    echo.
+    echo Нажмите любую клавишу для выхода...
+    pause
+    exit /b 1
+)
+
+echo [DEBUG] Python найден:
+python --version
 
 REM Проверяем наличие виртуального окружения
 if not exist "venv\Scripts\activate.bat" (
@@ -13,6 +30,7 @@ if not exist "venv\Scripts\activate.bat" (
     python -m venv venv
     if errorlevel 1 (
         echo [ОШИБКА] Не удалось создать виртуальное окружение!
+        echo Нажмите любую клавишу для выхода...
         pause
         exit /b 1
     )
@@ -25,6 +43,7 @@ call venv\Scripts\activate.bat
 
 if errorlevel 1 (
     echo [ОШИБКА] Не удалось активировать виртуальное окружение!
+    echo Нажмите любую клавишу для выхода...
     pause
     exit /b 1
 )
@@ -38,6 +57,7 @@ pip install -r requirements.txt --quiet
 if errorlevel 1 (
     echo [ОШИБКА] Не удалось установить зависимости!
     echo Проверьте файл requirements.txt
+    echo Нажмите любую клавишу для выхода...
     pause
     exit /b 1
 )
@@ -54,6 +74,10 @@ if not exist "test08.xlsx" (
 REM Запускаем скрипт с параметрами
 echo [INFO] Запуск скрипта с параметрами...
 echo Команда: python main.py test08.xlsx --auto-date-processing
+echo.
+echo [DEBUG] Начинаем выполнение Python скрипта...
+echo [DEBUG] Консоль будет показывать прогресс выполнения
+echo ========================================
 echo.
 
 python main.py test08.xlsx --auto-date-processing
