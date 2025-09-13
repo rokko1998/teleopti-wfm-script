@@ -75,6 +75,8 @@ def main():
     parser.add_argument("--no-headless", help="Запуск с видимым браузером", action="store_true")
     parser.add_argument("--with-skills", help="Включить работу с навыками (добавление без очистки)", action="store_true")
     parser.add_argument("--auto-date-processing", help="Автоматически определять дату из первой строки и обрабатывать только строки с этой датой", action="store_true")
+    parser.add_argument("--log-level", help="Уровень логирования (DEBUG, INFO, WARNING, ERROR)", 
+                       choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="ERROR")
 
     args = parser.parse_args()
 
@@ -82,6 +84,15 @@ def main():
     yaml_path = Path(args.yaml_cfg) if args.yaml_cfg else BASE_DIR / "region_skills.yml"
     out_csv_path = Path(args.out_csv)
     headless = args.headless and not args.no_headless
+
+    # Настраиваем логирование
+    logger.remove()  # Удаляем стандартный обработчик
+    logger.add(
+        sys.stderr,
+        level=args.log_level,
+        format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
+        colorize=True
+    )
 
     # Настраиваем прокси
     setup_proxy()
