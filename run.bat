@@ -49,8 +49,8 @@ if exist "%ACT%" call "%ACT%" 1>nul 2>nul
 REM === 5) Запуск строго через интерпретатор из venv (без двусмысленности) ===
 echo [INFO] CWD = "%CURR%"
 echo [INFO] PY  = "%PY%"
-echo [INFO] RUN = "%PY%" "%MAIN%" "%INPUT%" --log-level ERROR %*
-"%PY%" "%MAIN%" "%INPUT%" --log-level ERROR %*
+echo [INFO] RUN = "%PY%" "%MAIN%" "%INPUT%" --auto-date-processing --log-level ERROR %*
+"%PY%" "%MAIN%" "%INPUT%" --auto-date-processing --log-level ERROR %*
 set "EC=%ERRORLEVEL%"
 
 REM === 6) Возврат в исходную директорию и выход с тем же кодом ===
