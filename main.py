@@ -61,6 +61,7 @@ from modules.excel_manager import (
     save_single_result_to_original_file
 )
 from modules.post_processor import post_process_excel_file
+from modules.cleanup_manager import cleanup_downloaded_files
 
 # Константы
 BASE_DIR = Path(__file__).resolve().parent
@@ -374,6 +375,16 @@ def main():
     finally:
         # Закрываем браузер
         driver.quit()
+        
+        # Очищаем скачанные файлы
+        logger.info("🧹 Начинаем очистку скачанных файлов...")
+        try:
+            cleanup_downloaded_files()
+            logger.info("✅ Очистка скачанных файлов завершена")
+        except Exception as e:
+            logger.error(f"❌ Ошибка при очистке скачанных файлов: {e}")
+            logger.exception("Полный traceback:")
+            # Не прерываем выполнение, так как основная задача уже выполнена
 
 
 if __name__ == "__main__":

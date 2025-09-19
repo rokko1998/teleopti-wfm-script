@@ -222,7 +222,7 @@ def _find_best_row_by_notes(group: pd.DataFrame) -> int:
                 notes_str = str(notes).strip()
                 count = len(notes_str)
                 logger.info(f"      📝 Строка {row['_row_index']}: заметки = '{notes}' (символов: {count})")
-        
+
         notes_counts.append((count, idx))
 
     # Сортируем по убыванию количества заметок
