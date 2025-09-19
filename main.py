@@ -60,6 +60,7 @@ from modules.excel_manager import (
     calculate_time_window_for_date,
     save_single_result_to_original_file
 )
+from modules.post_processor import post_process_excel_file
 
 # Константы
 BASE_DIR = Path(__file__).resolve().parent
@@ -75,7 +76,7 @@ def main():
     parser.add_argument("--no-headless", help="Запуск с видимым браузером", action="store_true")
     parser.add_argument("--with-skills", help="Включить работу с навыками (добавление без очистки)", action="store_true")
     parser.add_argument("--auto-date-processing", help="Автоматически определять дату из первой строки и обрабатывать только строки с этой датой", action="store_true")
-    parser.add_argument("--log-level", help="Уровень логирования (DEBUG, INFO, WARNING, ERROR)", 
+    parser.add_argument("--log-level", help="Уровень логирования (DEBUG, INFO, WARNING, ERROR)",
                        choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="ERROR")
 
     args = parser.parse_args()
@@ -269,6 +270,16 @@ def main():
             logger.info(f"💾 Результаты сохранены в исходный файл: {input_xlsx_path}")
             logger.info(f"📊 Статистика: {len(results)}/{len(df_to_process)} строк обработано успешно")
 
+            # Выполняем постобработку данных
+            logger.info("🔧 Начинаем постобработку данных...")
+            try:
+                post_process_excel_file(input_xlsx_path)
+                logger.info("✅ Постобработка данных завершена успешно")
+            except Exception as e:
+                logger.error(f"❌ Ошибка при постобработке данных: {e}")
+                logger.exception("Полный traceback:")
+                # Не прерываем выполнение, так как основная задача уже выполнена
+
         else:
             # Стандартный режим: обработка всех проблем
             logger.info("📋 Используется стандартный режим обработки всех проблем")
@@ -348,6 +359,17 @@ def main():
             # Сохраняем в CSV файл (стандартный режим)
             save_results_to_csv(results, out_csv_path)
             logger.info(f"📊 Статистика: {len(results)}/{len(df)} строк обработано успешно")
+
+            # Выполняем постобработку данных (только если есть результаты)
+            if results:
+                logger.info("🔧 Начинаем постобработку данных...")
+                try:
+                    post_process_excel_file(input_xlsx_path)
+                    logger.info("✅ Постобработка данных завершена успешно")
+                except Exception as e:
+                    logger.error(f"❌ Ошибка при постобработке данных: {e}")
+                    logger.exception("Полный traceback:")
+                    # Не прерываем выполнение, так как основная задача уже выполнена
 
     finally:
         # Закрываем браузер

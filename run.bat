@@ -50,6 +50,10 @@ REM === 5) Запуск строго через интерпретатор из 
 echo [INFO] CWD = "%CURR%"
 echo [INFO] PY  = "%PY%"
 echo [INFO] RUN = "%PY%" "%MAIN%" "%INPUT%" --auto-date-processing --log-level ERROR %*
+echo [INFO] ВНИМАНИЕ: После выгрузки будет выполнена постобработка данных
+echo [INFO] - Поиск дубликатов в колонке "Потерянные"
+echo [INFO] - Сравнение регионов и заметок
+echo [INFO] - Зануление строк с отрицательным "Превышение"
 "%PY%" "%MAIN%" "%INPUT%" --auto-date-processing --log-level ERROR %*
 set "EC=%ERRORLEVEL%"
 
