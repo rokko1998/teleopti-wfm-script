@@ -15,7 +15,17 @@ pushd "%~dp0" || (
 REM Текущая папка теперь гарантированно на букве диска (не UNC)
 set "CURR=%CD%"
 
-REM === 2) Указываем интерпретатор из venv и целевые файлы ===
+REM === 2) Автоматическое определение Python и настройка venv ===
+call :FindPython
+if "%PYTHON_PATH%"=="" (
+  echo [ERROR] Python не найден в системе
+  echo Проверьте установку Python или добавьте его в PATH
+  popd & pause & exit /b 2
+)
+
+echo [INFO] Найден Python: "%PYTHON_PATH%"
+
+REM Указываем интерпретатор из venv и целевые файлы
 set "PY=%CURR%\.venv\Scripts\python.exe"
 set "ACT=%CURR%\.venv\Scripts\activate.bat"
 set "MAIN=%CURR%\main.py"
@@ -26,11 +36,25 @@ if "%INPUT%"=="" set "INPUT=%CURR%\test08.xlsx"
 REM Если пришёл относительный путь или имя файла без пути — добавим текущую папку
 if not exist "%INPUT%" if exist "%CURR%\%~1" set "INPUT=%CURR%\%~1"
 
-REM === 3) Проверки наличия ===
+REM === 3) Проверки наличия и создание/исправление venv ===
 if not exist "%PY%" (
-  echo [ERROR] Не найден интерпретатор venv: "%PY%"
-  echo Создай окружение: python -m venv .venv ^&^& .venv\Scripts\pip install -r requirements.txt
-  popd & pause & exit /b 2
+  echo [INFO] venv не найден, создаем новое окружение...
+  call :CreateVenv
+  if errorlevel 1 (
+    echo [ERROR] Не удалось создать venv
+    popd & pause & exit /b 2
+  )
+) else (
+  echo [INFO] Проверяем корректность существующего venv...
+  call :CheckVenv
+  if errorlevel 1 (
+    echo [INFO] venv поврежден, пересоздаем...
+    call :RecreateVenv
+    if errorlevel 1 (
+      echo [ERROR] Не удалось пересоздать venv
+      popd & pause & exit /b 2
+    )
+  )
 )
 
 if not exist "%MAIN%" (
@@ -54,7 +78,9 @@ echo [INFO] ВНИМАНИЕ: После выгрузки будет выпол�
 echo [INFO] - Поиск дубликатов в колонке "Потерянные"
 echo [INFO] - Сравнение регионов и заметок
 echo [INFO] - Зануление строк с отрицательным "Превышение"
-"%PY%" "%MAIN%" "%INPUT%" --auto-date-processing --log-level ERROR %*
+
+REM Запускаем с обработкой ошибки 103
+call :RunWithErrorHandling
 set "EC=%ERRORLEVEL%"
 
 REM === 6) Возврат в исходную директорию и выход с тем же кодом ===
@@ -66,3 +92,127 @@ if not "%EC%"=="0" (
   echo [OK] Готово
   pause & exit /b 0
 )
+
+REM === ФУНКЦИИ ===
+
+:FindPython
+REM Поиск Python в различных местах
+set "PYTHON_PATH="
+
+REM 1. Проверяем PATH
+python --version >nul 2>&1
+if not errorlevel 1 (
+  for /f "tokens=*" %%i in ('where python 2^>nul') do (
+    set "PYTHON_PATH=%%i"
+    goto :FoundPython
+  )
+)
+
+REM 2. Проверяем стандартные места установки
+for %%p in (
+  "C:\py\python.exe"
+  "C:\Python39\python.exe"
+  "C:\Python310\python.exe"
+  "C:\Python311\python.exe"
+  "C:\Python312\python.exe"
+  "C:\Python313\python.exe"
+  "C:\Program Files\Python39\python.exe"
+  "C:\Program Files\Python310\python.exe"
+  "C:\Program Files\Python311\python.exe"
+  "C:\Program Files\Python312\python.exe"
+  "C:\Program Files\Python313\python.exe"
+  "C:\Program Files (x86)\Python39\python.exe"
+  "C:\Program Files (x86)\Python310\python.exe"
+  "C:\Program Files (x86)\Python311\python.exe"
+  "C:\Program Files (x86)\Python312\python.exe"
+  "C:\Program Files (x86)\Python313\python.exe"
+) do (
+  if exist %%p (
+    set "PYTHON_PATH=%%p"
+    goto :FoundPython
+  )
+)
+
+REM 3. Поиск в реестре (если доступен)
+for /f "tokens=2*" %%a in ('reg query "HKEY_LOCAL_MACHINE\SOFTWARE\Python\PythonCore" /s /v "ExecutablePath" 2^>nul ^| findstr "ExecutablePath"') do (
+  if exist "%%b" (
+    set "PYTHON_PATH=%%b"
+    goto :FoundPython
+  )
+)
+
+REM 4. Поиск в пользовательском реестре
+for /f "tokens=2*" %%a in ('reg query "HKEY_CURRENT_USER\SOFTWARE\Python\PythonCore" /s /v "ExecutablePath" 2^>nul ^| findstr "ExecutablePath"') do (
+  if exist "%%b" (
+    set "PYTHON_PATH=%%b"
+    goto :FoundPython
+  )
+)
+
+:FoundPython
+exit /b 0
+
+:CreateVenv
+REM Создание нового venv
+echo [INFO] Создаем venv с Python: "%PYTHON_PATH%"
+"%PYTHON_PATH%" -m venv .venv
+if errorlevel 1 exit /b 1
+
+echo [INFO] Устанавливаем зависимости...
+.venv\Scripts\pip.exe install -r requirements.txt
+if errorlevel 1 exit /b 1
+
+echo [INFO] venv создан успешно
+exit /b 0
+
+:CheckVenv
+REM Проверка корректности существующего venv
+echo [INFO] Проверяем venv...
+.venv\Scripts\python.exe --version >nul 2>&1
+if errorlevel 1 exit /b 1
+
+REM Проверяем наличие основных пакетов
+.venv\Scripts\python.exe -c "import selenium, pandas, openpyxl, loguru, tqdm" >nul 2>&1
+if errorlevel 1 exit /b 1
+
+echo [INFO] venv корректен
+exit /b 0
+
+:RecreateVenv
+REM Пересоздание venv
+echo [INFO] Удаляем старый venv...
+if exist .venv rmdir /s /q .venv
+
+echo [INFO] Создаем новый venv с Python: "%PYTHON_PATH%"
+"%PYTHON_PATH%" -m venv .venv
+if errorlevel 1 exit /b 1
+
+echo [INFO] Устанавливаем зависимости...
+.venv\Scripts\pip.exe install -r requirements.txt
+if errorlevel 1 exit /b 1
+
+echo [INFO] venv пересоздан успешно
+exit /b 0
+
+:RunWithErrorHandling
+REM Запуск с обработкой ошибки 103
+"%PY%" "%MAIN%" "%INPUT%" --auto-date-processing --log-level ERROR %*
+set "RUN_EC=%ERRORLEVEL%"
+
+REM Если получили ошибку 103, пытаемся исправить
+if "%RUN_EC%"=="103" (
+  echo [WARNING] Обнаружена ошибка 103 - проблема с путем к Python
+  echo [INFO] Пересоздаем venv с правильным Python...
+
+  call :RecreateVenv
+  if errorlevel 1 (
+    echo [ERROR] Не удалось исправить venv
+    exit /b 103
+  )
+
+  echo [INFO] Повторный запуск после исправления...
+  "%PY%" "%MAIN%" "%INPUT%" --auto-date-processing --log-level ERROR %*
+  set "RUN_EC=%ERRORLEVEL%"
+)
+
+exit /b %RUN_EC%
