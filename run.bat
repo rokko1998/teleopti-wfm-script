@@ -215,13 +215,13 @@ REM Если получили ошибку 103, пытаемся исправи�
 if "%RUN_EC%"=="103" (
   echo [WARNING] Обнаружена ошибка 103 - проблема с путем к Python
   echo [INFO] Исправляем пути в venv...
-  
+
   call :RecreateVenv
   if errorlevel 1 (
     echo [ERROR] Не удалось исправить venv
     exit /b 103
   )
-  
+
   echo [INFO] Повторный запуск после исправления...
   "%PY%" "%MAIN%" "%INPUT%" --auto-date-processing --log-level ERROR %*
   set "RUN_EC=%ERRORLEVEL%"
