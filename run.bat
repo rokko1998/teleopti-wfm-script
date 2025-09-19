@@ -48,12 +48,12 @@ if not exist "%PY%" (
   echo [INFO] Проверяем корректность существующего venv...
   call :CheckVenv
   if errorlevel 1 (
-    echo [INFO] venv поврежден, пересоздаем...
-    call :RecreateVenv
-    if errorlevel 1 (
-      echo [ERROR] Не удалось пересоздать venv
-      popd & pause & exit /b 2
-    )
+  echo [INFO] venv поврежден, исправляем пути...
+  call :RecreateVenv
+  if errorlevel 1 (
+    echo [ERROR] Не удалось исправить venv
+    popd & pause & exit /b 2
+  )
   )
 )
 
@@ -179,19 +179,31 @@ echo [INFO] venv корректен
 exit /b 0
 
 :RecreateVenv
-REM Пересоздание venv
-echo [INFO] Удаляем старый venv...
-if exist .venv rmdir /s /q .venv
+REM Исправление путей в существующем venv
+echo [INFO] Исправляем пути в существующем venv...
 
-echo [INFO] Создаем новый venv с Python: "%PYTHON_PATH%"
-"%PYTHON_PATH%" -m venv .venv
-if errorlevel 1 exit /b 1
+REM Обновляем pyvenv.cfg
+if exist .venv\pyvenv.cfg (
+  echo [INFO] Обновляем pyvenv.cfg...
+  echo home = %PYTHON_PATH% > .venv\pyvenv.cfg
+  echo include-system-site-packages = false >> .venv\pyvenv.cfg
+  echo version = 3.13 >> .venv\pyvenv.cfg
+)
 
-echo [INFO] Устанавливаем зависимости...
-.venv\Scripts\pip.exe install -r requirements.txt
-if errorlevel 1 exit /b 1
+REM Обновляем python.exe (копируем правильный Python)
+if exist "%PYTHON_PATH%" (
+  echo [INFO] Копируем правильный Python в venv...
+  copy /Y "%PYTHON_PATH%" .venv\Scripts\python.exe >nul 2>&1
+  copy /Y "%PYTHON_PATH%" .venv\Scripts\pythonw.exe >nul 2>&1
+)
 
-echo [INFO] venv пересоздан успешно
+REM Обновляем pip
+if exist .venv\Scripts\python.exe (
+  echo [INFO] Обновляем pip...
+  .venv\Scripts\python.exe -m ensurepip --upgrade >nul 2>&1
+)
+
+echo [INFO] Пути в venv исправлены успешно
 exit /b 0
 
 :RunWithErrorHandling
@@ -202,14 +214,14 @@ set "RUN_EC=%ERRORLEVEL%"
 REM Если получили ошибку 103, пытаемся исправить
 if "%RUN_EC%"=="103" (
   echo [WARNING] Обнаружена ошибка 103 - проблема с путем к Python
-  echo [INFO] Пересоздаем venv с правильным Python...
-
+  echo [INFO] Исправляем пути в venv...
+  
   call :RecreateVenv
   if errorlevel 1 (
     echo [ERROR] Не удалось исправить venv
     exit /b 103
   )
-
+  
   echo [INFO] Повторный запуск после исправления...
   "%PY%" "%MAIN%" "%INPUT%" --auto-date-processing --log-level ERROR %*
   set "RUN_EC=%ERRORLEVEL%"
